@@ -1,2 +1,2 @@
 [lfs]
-url = ssh://git@github.com/jup-ag/chainkit.git/info/lfs
+url = https://github.com/jup-ag/chainkit.git/info/lfs
