@@ -1,0 +1,203 @@
+[Error]
+enum TransactionError {
+  "KeyPair",
+  "SignerMissing",
+  "MultipleSigners",
+  "PrivateKey",
+  "PublicKey",
+  "Parameters",
+  "ParsingFailure",
+  "InstructionError",
+  "DecimalConversion",
+  "Generic",
+};
+
+[Error]
+enum KeyError {
+  "InvalidKeypair",
+  "InvalidMnemonic",
+  "DerivationPath",
+  "PrivateKey",
+  "PublicKey",
+  "Generic",
+};
+
+[Error]
+enum EncryptionError {
+  "Generic"
+};
+
+enum Blockchain {
+  "Solana"
+};
+
+enum ChainNetwork {
+  "Mainnet",
+  "Testnet"
+};
+
+dictionary Derivation {
+  u32 start;
+  u32 count;
+  u32 account;
+  ChainNetwork network;
+};
+
+dictionary MnemonicWords {
+    sequence<string> words;
+};
+
+dictionary DerivedPrivateKey {
+    string contents;
+    ChainPublicKey public_key;
+    u32 index;
+};
+
+dictionary ChainPrivateKey {
+    string contents;
+    ChainPublicKey public_key;
+};
+
+dictionary ChainPublicKey {
+    string contents;
+    Blockchain chain;
+};
+
+dictionary DecimalNumber {
+    string value;
+};
+
+dictionary ParsedTransaction {
+    ChainPublicKey? from;
+    ChainPublicKey to;
+    TransactionData data;
+};
+
+dictionary ChainTransaction {
+  string tx;
+  sequence<ChainPublicKey> signers;
+  string? full_signature;
+  sequence<string>? signatures;
+  sequence<ChainPublicKey> accounts;
+  sequence<string> instruction_programs;
+};
+
+[Enum]
+interface TransactionData {
+  Solana();
+};
+
+[Enum]
+interface SolanaTransactionType {
+  Legacy();
+  Versioned();
+};
+
+[Enum]
+interface TransactionParameters {
+  Solana(ExternalAddress? external_address, SolanaTransactionType transaction_type, string? owner_program, u8? decimals, string? memo, sequence<string> references, u16? swap_slippage_bps, u64? compute_budget_unit_price, u32? compute_budget_unit_limit);
+};
+
+[Enum]
+interface TransactionKind {
+  Token(DecimalNumber amount, boolean close_account);
+  Nft(u64 amount, string? id);
+};
+[Enum]
+interface TokenDestination {
+  Account(string transfer_destination);
+  Wallet(ChainPublicKey public_key);
+};
+
+namespace ChainKit {
+
+  // Key Functions
+
+  // Derive the given PrivateKeys based on the derivation data
+  [Throws=KeyError]
+  sequence<DerivedPrivateKey> derive(Blockchain chain, MnemonicWords mnemonic, string? passphrase, Derivation derivation);
+
+  // Derive the given PrivateKeys based on the derivation data
+  [Throws=KeyError]
+  MnemonicWords generate_mnemonic(u32 length);
+
+  // Derive a PrivateKey based on hash
+  [Throws=KeyError]
+  DerivedPrivateKey derive_from_data(Blockchain chain, string data);
+
+  // Convert raw bytes into a private key and validate the result
+  // the `raw` data are the ascii codepoints of the string making up the private key.
+  [Throws=KeyError]
+  ChainPrivateKey raw_private_key(Blockchain chain, string key);
+
+  // Check whether a given string is a valid public key
+  boolean is_valid(Blockchain chain, string address);
+
+  // Parse `address` and determine the correct blockchain for this public key
+  ChainPublicKey? parse_public_key(string address);
+
+  // Tries to parse any data into a private key for a given blockchain
+  ChainPrivateKey? parse_private_key(string key);
+
+  // Transaction Functions
+
+  // Creates a `send` transaction with the native token.
+  // Returns the signed transaction as a base64 encoded string.
+  [Throws=TransactionError]
+  string send_transaction(Blockchain chain, ChainPublicKey sender, ChainPublicKey receiver, DecimalNumber amount, TransactionParameters parameters);
+
+  // Creates a Token transaction. Token can be either a Nft or a chain token.
+  // Returns the signed transaction as a base64 encoded string.
+  [Throws=TransactionError]
+  string token_transaction(Blockchain chain, TokenDestination destination, ChainPublicKey owner, ChainPublicKey token, TransactionKind kind, TransactionParameters parameters);
+
+  // Sign an existing transaction with the given private keys
+  // Returns the signed transaction as a base64 encoded string.
+  [Throws=TransactionError]
+  ChainTransaction sign_transaction(Blockchain chain, string transaction, sequence<ChainPrivateKey> signers, TransactionParameters? parameters);
+
+  // Sign a message with the given private keys
+  [Throws=TransactionError]
+  string sign_message(Blockchain chain, string message, sequence<ChainPrivateKey> signers);
+
+  // Sign a typed data with given private keys
+  [Throws=TransactionError]
+  string sign_typed_data(Blockchain chain, string typed_data, sequence<ChainPrivateKey> signers);
+
+  // Modify the given transaction with the updated parameters
+  [Throws=TransactionError]
+  string modify_transaction(Blockchain chain, string transaction, ChainPrivateKey owner, TransactionParameters parameters);
+
+  // Parse a transaction string and return the contents
+  [Throws=TransactionError]
+  ParsedTransaction parse_transaction(Blockchain chain, string transaction);
+
+  // Encryption Related functions
+  [Throws=EncryptionError]
+  string encrypt_plaintext(string plaintext, string password);
+
+  [Throws=EncryptionError]
+  string decrypt_ciphertext(string ciphertext, string password);
+
+  // Gets associated token address.
+  [Throws=TransactionError]
+  ChainPublicKey get_associated_token_address(string wallet_address, string owner_program, string token_mint_address);
+
+  // Gets associated program address
+  [Throws=TransactionError]
+  ChainPublicKey get_program_address(sequence<string> seeds, string program);
+
+  // Converts a serialized transaction into a serialized message
+  [Throws=TransactionError]
+  string get_message(string transaction);
+
+  // Appends a signature to a given transaction
+  [Throws=TransactionError]
+  string append_signature_to_transaction(string signer, string signature, string transaction);
+};
+
+// Solana Specific Types
+
+dictionary ExternalAddress {
+    string recent_blockhash;
+};
