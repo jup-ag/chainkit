@@ -10,8 +10,6 @@ ChainKit can be built for Apple platforms (iOS/macOS) and Android.
 
 - Rust and Cargo
 - Xcode and iOS SDK (for Apple platforms)
-- Android SDK and NDK version 28.0.12433566 (for Android)
-- `ANDROID_HOME` environment variable set to your Android SDK location
 
 ### Build Commands
 
