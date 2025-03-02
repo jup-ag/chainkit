@@ -30,13 +30,74 @@ ENABLE_X86?=false
 # Should we also build for simulator? Enabled by default but disabled on CI
 ENABLE_SIMULATOR?=true
 
+# Android SDK path (can be overridden via environment variable)
+ANDROID_HOME?=$(HOME)/Library/Android/sdk
 # Android NDK version
 ANDROID_NDK_VERSION?=28.0.12433566
 # Android platform target
 ANDROID_PLATFORM?=24
+# Android NDK Path
+ANDROID_NDK_HOME?=$(ANDROID_HOME)/ndk/$(ANDROID_NDK_VERSION)
+# Android command line tools version
+ANDROID_CMDLINE_TOOLS_VERSION?=11076708
+# Android command line tools latest path
+ANDROID_CMDLINE_TOOLS_PATH?=$(ANDROID_HOME)/cmdline-tools/latest
 
 # Ensure ios directory exists
 $(shell mkdir -p platforms/ios)
+
+# Check if Android SDK is installed
+define check_android_sdk
+	@if [ -z "$(ANDROID_HOME)" ]; then \
+		echo "ERROR: ANDROID_HOME environment variable is not set"; \
+		echo "Please set ANDROID_HOME to the location of your Android SDK"; \
+		exit 1; \
+	fi
+	@if [ ! -d "$(ANDROID_HOME)" ]; then \
+		echo "------> Creating Android SDK directory at $(ANDROID_HOME)"; \
+		mkdir -p "$(ANDROID_HOME)"; \
+	fi
+	@echo "------> Using Android SDK at $(ANDROID_HOME)"
+endef
+
+# Check if Android command line tools are installed
+define check_android_cmdline_tools
+	@if [ ! -d "$(ANDROID_CMDLINE_TOOLS_PATH)" ]; then \
+		echo "------> Android command line tools not found at $(ANDROID_CMDLINE_TOOLS_PATH)"; \
+		echo "------> Installing Android command line tools..."; \
+		CMDLINE_TOOLS_ZIP="commandlinetools-mac-$(ANDROID_CMDLINE_TOOLS_VERSION)_latest.zip"; \
+		DOWNLOAD_URL="https://dl.google.com/android/repository/$$CMDLINE_TOOLS_ZIP"; \
+		TMP_DIR=$$(mktemp -d); \
+		curl -L $$DOWNLOAD_URL -o $$TMP_DIR/$$CMDLINE_TOOLS_ZIP; \
+		mkdir -p "$(ANDROID_HOME)/cmdline-tools"; \
+		unzip -q $$TMP_DIR/$$CMDLINE_TOOLS_ZIP -d $$TMP_DIR; \
+		mv $$TMP_DIR/cmdline-tools "$(ANDROID_HOME)/cmdline-tools/latest"; \
+		rm -rf $$TMP_DIR; \
+		if [ ! -d "$(ANDROID_CMDLINE_TOOLS_PATH)" ]; then \
+			echo "ERROR: Failed to install Android command line tools"; \
+			exit 1; \
+		fi; \
+		echo "------> Android command line tools installed successfully"; \
+	else \
+		echo "------> Using Android command line tools from $(ANDROID_CMDLINE_TOOLS_PATH)"; \
+	fi
+endef
+
+# Check if Android NDK is installed
+define check_android_ndk
+	@if [ ! -d "$(ANDROID_NDK_HOME)" ]; then \
+		echo "------> Android NDK $(ANDROID_NDK_VERSION) not found at $(ANDROID_NDK_HOME)"; \
+		echo "------> Installing Android NDK $(ANDROID_NDK_VERSION)..."; \
+		"$(ANDROID_CMDLINE_TOOLS_PATH)/bin/sdkmanager" --install "ndk;$(ANDROID_NDK_VERSION)"; \
+		if [ ! -d "$(ANDROID_NDK_HOME)" ]; then \
+			echo "ERROR: Failed to install Android NDK $(ANDROID_NDK_VERSION)"; \
+			exit 1; \
+		fi; \
+		echo "------> Android NDK $(ANDROID_NDK_VERSION) installed successfully"; \
+	else \
+		echo "------> Using Android NDK $(ANDROID_NDK_VERSION) from $(ANDROID_NDK_HOME)"; \
+	fi
+endef
 
 apple:
 	@echo "------> Starting Apple build..."
@@ -56,6 +117,11 @@ android:
 	@echo "------> Configuration: $(CONFIGURATION), Folder: $(FOLDER)"
 	@echo "------> NDK Version: $(ANDROID_NDK_VERSION), Platform: $(ANDROID_PLATFORM)"
 	
+	# Check Android SDK and install components if needed
+	$(call check_android_sdk)
+	$(call check_android_cmdline_tools)
+	$(call check_android_ndk)
+	
 	@echo "------> Adding Android targets..."
 	rustup target add \
 		aarch64-linux-android \
@@ -71,11 +137,12 @@ android:
 	
 	@echo "------> Building libraries..."
 	CARGO_PROFILE_RELEASE_STRIP=$(if $(findstring release,$(FOLDER)),true,false) \
+	ANDROID_NDK_HOME=$(ANDROID_NDK_HOME) \
 	cargo \
-		--config target.x86_64-linux-android.linker=\"$(ANDROID_HOME)/ndk/$(ANDROID_NDK_VERSION)/toolchains/llvm/prebuilt/darwin-x86_64/bin/x86_64-linux-android$(ANDROID_PLATFORM)-clang\" \
-		--config target.i686-linux-android.linker=\"$(ANDROID_HOME)/ndk/$(ANDROID_NDK_VERSION)/toolchains/llvm/prebuilt/darwin-x86_64/bin/i686-linux-android$(ANDROID_PLATFORM)-clang\" \
-		--config target.armv7-linux-androideabi.linker=\"$(ANDROID_HOME)/ndk/$(ANDROID_NDK_VERSION)/toolchains/llvm/prebuilt/darwin-x86_64/bin/armv7a-linux-androideabi$(ANDROID_PLATFORM)-clang\" \
-		--config target.aarch64-linux-android.linker=\"$(ANDROID_HOME)/ndk/$(ANDROID_NDK_VERSION)/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android$(ANDROID_PLATFORM)-clang\" \
+		--config target.x86_64-linux-android.linker=\"$(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/bin/x86_64-linux-android$(ANDROID_PLATFORM)-clang\" \
+		--config target.i686-linux-android.linker=\"$(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/bin/i686-linux-android$(ANDROID_PLATFORM)-clang\" \
+		--config target.armv7-linux-androideabi.linker=\"$(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/bin/armv7a-linux-androideabi$(ANDROID_PLATFORM)-clang\" \
+		--config target.aarch64-linux-android.linker=\"$(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android$(ANDROID_PLATFORM)-clang\" \
 		ndk \
 		--platform $(ANDROID_PLATFORM) \
 		--target aarch64-linux-android \
@@ -98,10 +165,10 @@ android:
 	cp target/x86_64-linux-android/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/x86_64/libuniffi_ChainKit.so
 	
 	@echo "------> Copying shared libraries..."
-	cp $(ANDROID_HOME)/ndk/$(ANDROID_NDK_VERSION)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/arm64-v8a/libc++_shared.so
-	cp $(ANDROID_HOME)/ndk/$(ANDROID_NDK_VERSION)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/armeabi-v7a/libc++_shared.so
-	cp $(ANDROID_HOME)/ndk/$(ANDROID_NDK_VERSION)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/i686-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/x86/libc++_shared.so
-	cp $(ANDROID_HOME)/ndk/$(ANDROID_NDK_VERSION)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/x86_64/libc++_shared.so
+	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/arm64-v8a/libc++_shared.so
+	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/armeabi-v7a/libc++_shared.so
+	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/i686-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/x86/libc++_shared.so
+	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/x86_64/libc++_shared.so
 	
 	@echo "------> Android build completed successfully!"
 
