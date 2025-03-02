@@ -1,3 +1,2 @@
-[remote]
-autodetect = true
-searchall = true
+[lfs]
+url = git@github.com:jup-ag/chainkit.git
