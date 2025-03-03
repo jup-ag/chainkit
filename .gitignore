@@ -8,3 +8,6 @@ target
 .swiftpm*
 
 # Ignore the extracted XCFramework platform directories but keep their zip files
+platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework/*
+!platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework/*.zip
+!platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework/Info.plist
