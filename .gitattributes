@@ -1,3 +1,12 @@
-platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework/ios-arm64-simulator/ChainKitFFI.framework/ChainKitFFI filter=lfs diff=lfs merge=lfs -text
-platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework/ios-arm64/ChainKitFFI.framework/ChainKitFFI filter=lfs diff=lfs merge=lfs -text
-*.so filter=lfs diff=lfs merge=lfs -text
+# No special Git attributes needed
+# Explicitly untrack any previous LFS-tracked files
+platforms/android/chainkit/src/main/jniLibs/arm64-v8a/libc++_shared.so -filter -diff -merge -text
+platforms/android/chainkit/src/main/jniLibs/arm64-v8a/libuniffi_ChainKit.so -filter -diff -merge -text
+platforms/android/chainkit/src/main/jniLibs/armeabi-v7a/libc++_shared.so -filter -diff -merge -text
+platforms/android/chainkit/src/main/jniLibs/armeabi-v7a/libuniffi_ChainKit.so -filter -diff -merge -text
+platforms/android/chainkit/src/main/jniLibs/x86/libc++_shared.so -filter -diff -merge -text
+platforms/android/chainkit/src/main/jniLibs/x86/libuniffi_ChainKit.so -filter -diff -merge -text
+platforms/android/chainkit/src/main/jniLibs/x86_64/libc++_shared.so -filter -diff -merge -text
+platforms/android/chainkit/src/main/jniLibs/x86_64/libuniffi_ChainKit.so -filter -diff -merge -text
+platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework/ios-arm64-simulator/ChainKitFFI.framework/ChainKitFFI -filter -diff -merge -text
+platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework/ios-arm64/ChainKitFFI.framework/ChainKitFFI -filter -diff -merge -text
