@@ -108,13 +108,13 @@ apple:
 	@echo "------> ENABLE_X86: $(ENABLE_X86), ENABLE_SIMULATOR: $(ENABLE_SIMULATOR)"
 	$(MAKE) build-framework
 	@echo "------> Compressing framework for SPM distribution..."
-	./scripts/compress-frameworks.sh
+	./scripts/compress_frameworks.sh
 	@echo "------> Apple build completed successfully!"
 
 # Just compresses existing framework files without rebuilding (for testing/development)
 compress-framework:
 	@echo "------> Running standalone compression of framework files..."
-	./scripts/compress-frameworks.sh
+	./scripts/compress_frameworks.sh
 	@echo "------> Standalone framework compression completed!"
 
 profile:
