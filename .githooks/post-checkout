@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# This script runs after git checkout, including initial clones
+
+echo "======================================"
+echo "🚀 POST-CHECKOUT HOOK IS RUNNING 🚀"
+echo "======================================"
+
+# Get the root of the git repository
+ROOT_DIR=$(git rev-parse --show-toplevel)
+
+# Only run the extraction if we're in the main branch or if this is a fresh clone
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+PREV_HEAD=$1
+NEW_HEAD=$2
+CHECKOUT_TYPE=$3
+
+echo "Current branch: $CURRENT_BRANCH"
+echo "Checkout type: $CHECKOUT_TYPE"
+
+# $3 = 1 if it's a branch checkout
+if [ "$CHECKOUT_TYPE" = "1" ] || [ "$PREV_HEAD" = "0000000000000000000000000000000000000000" ]; then
+    echo "🔄 Running framework extraction after checkout..."
+    "$ROOT_DIR/scripts/extract_frameworks.sh"
+fi
+
+exit 0 
