@@ -7,7 +7,12 @@ target
 .build*
 .swiftpm*
 
-# Ignore the extracted XCFramework platform directories but keep their zip files
+# XCFramework handling
 platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework/*
-!platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework/*.zip
 !platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework/Info.plist
+# Ignore framework zip files
+platforms/ios/ChainKit/Sources/ChainKitFFI-*.zip
+platforms/ios/ChainKit/Sources/*.zip
+
+# Package.swift backup
+Package.swift.bak

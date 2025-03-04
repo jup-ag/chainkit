@@ -107,15 +107,19 @@ apple:
 	@echo "------> Configuration: $(CONFIGURATION), Folder: $(FOLDER)"
 	@echo "------> ENABLE_X86: $(ENABLE_X86), ENABLE_SIMULATOR: $(ENABLE_SIMULATOR)"
 	$(MAKE) build-framework
-	@echo "------> Compressing framework for SPM distribution..."
-	./scripts/compress_frameworks.sh
 	@echo "------> Apple build completed successfully!"
 
-# Just compresses existing framework files without rebuilding (for testing/development)
-compress-framework:
-	@echo "------> Running standalone compression of framework files..."
-	./scripts/compress_frameworks.sh
-	@echo "------> Standalone framework compression completed!"
+# Target for releasing a version
+release:
+	@echo "------> Creating and uploading release with version $(VERSION)"
+	@if [ -z "$(VERSION)" ]; then \
+		echo "ERROR: VERSION not specified"; \
+		echo "Usage: make release VERSION=x.y.z"; \
+		exit 1; \
+	fi
+	@echo "------> Creating release package and uploading to GitHub..."
+	@./scripts/prepare_xcframework_for_distribution.sh $(VERSION)
+	@echo "------> Release v$(VERSION) completed!"
 
 profile:
 	@echo "------> Starting Apple profile build with x86_64 support..."
