@@ -49,6 +49,15 @@ After successful builds, the framework files will be located at:
 - **Android**: `platforms/android`
   - Native libraries for multiple architectures (arm64-v8a, armeabi-v7a, x86, x86_64)
 
+## Release
+
+**Make new release and upload binary frameworks:**
+```bash
+make release VERSION=1.0.0
+```
+
+Please see [RELEASE](https://github.com/jup-ag/chainkit/blob/main/RELEASE.md) for more details.
+
 ## Using ChainKit as a Dependency
 
 ### iOS (Swift Package Manager)
