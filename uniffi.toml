@@ -1,2 +1,7 @@
 [bindings]
 doc_comments = true
+
+[bindings.kotlin]
+package_name = "ag.jup.jupiter.android.library.chainkit"
+generate_immutable_records = true
+android = true
