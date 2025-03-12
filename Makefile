@@ -167,23 +167,23 @@ android:
 		build $(CONFIGURATION)
 	
 	@echo "------> Creating directories..."
-	mkdir -p platforms/android/app/src/main/jniLibs
-	mkdir -p platforms/android/app/src/main/jniLibs/arm64-v8a
-	mkdir -p platforms/android/app/src/main/jniLibs/armeabi-v7a
-	mkdir -p platforms/android/app/src/main/jniLibs/x86
-	mkdir -p platforms/android/app/src/main/jniLibs/x86_64
+	mkdir -p platforms/android/chainkit/src/main/jniLibs
+	mkdir -p platforms/android/chainkit/src/main/jniLibs/arm64-v8a
+	mkdir -p platforms/android/chainkit/src/main/jniLibs/armeabi-v7a
+	mkdir -p platforms/android/chainkit/src/main/jniLibs/x86
+	mkdir -p platforms/android/chainkit/src/main/jniLibs/x86_64
 	
 	@echo "------> Copying libraries..."
-	cp target/aarch64-linux-android/$(FOLDER)/libchainkit.so platforms/android/app/src/main/jniLibs/arm64-v8a/libuniffi_ChainKit.so
-	cp target/armv7-linux-androideabi/$(FOLDER)/libchainkit.so platforms/android/app/src/main/jniLibs/armeabi-v7a/libuniffi_ChainKit.so
-	cp target/i686-linux-android/$(FOLDER)/libchainkit.so platforms/android/app/src/main/jniLibs/x86/libuniffi_ChainKit.so
-	cp target/x86_64-linux-android/$(FOLDER)/libchainkit.so platforms/android/app/src/main/jniLibs/x86_64/libuniffi_ChainKit.so
+	cp target/aarch64-linux-android/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/arm64-v8a/libuniffi_ChainKit.so
+	cp target/armv7-linux-androideabi/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/armeabi-v7a/libuniffi_ChainKit.so
+	cp target/i686-linux-android/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/x86/libuniffi_ChainKit.so
+	cp target/x86_64-linux-android/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/x86_64/libuniffi_ChainKit.so
 	
 	@echo "------> Copying shared libraries..."
-	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so platforms/android/app/src/main/jniLibs/arm64-v8a/libc++_shared.so
-	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so platforms/android/app/src/main/jniLibs/armeabi-v7a/libc++_shared.so
-	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/i686-linux-android/libc++_shared.so platforms/android/app/src/main/jniLibs/x86/libc++_shared.so
-	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so platforms/android/app/src/main/jniLibs/x86_64/libc++_shared.so
+	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/arm64-v8a/libc++_shared.so
+	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/armeabi-v7a/libc++_shared.so
+	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/i686-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/x86/libc++_shared.so
+	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/x86_64/libc++_shared.so
 	
 	@echo "------> Android build completed successfully!"
 	@make bindgen-kotlin
@@ -209,7 +209,7 @@ clean:
 	rm -rf generated
 	rm -f platforms/ios/ChainKit/Sources/ChainKit/ChainKit.swift
 	rm -rf platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework
-	rm -rf platforms/android/app/src/main/jniLibs
+	rm -rf platforms/android/chainkit/src/main/jniLibs
 	@echo "------> Clean completed successfully!"
 
 # Build targets for all architectures
@@ -230,7 +230,7 @@ bindgen-swift:
 # Use Uniffi to build the glue ChainKit.kt
 bindgen-kotlin:
 	@echo "------> Generating Kotlin bindings from UDL..."
-	cargo run --manifest-path Cargo.toml --features="uniffi/cli" --bin uniffi-bindgen generate src/interface.udl --language kotlin --out-dir platforms/android/app/src/main/java
+	cargo run --manifest-path Cargo.toml --features="uniffi/cli" --bin uniffi-bindgen generate src/interface.udl --language kotlin --out-dir platforms/android/chainkit/src/main/java
 
 # Take the different targets, and put them into ChainKit.framework files per architecture
 assemble-frameworks:

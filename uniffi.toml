@@ -2,6 +2,6 @@
 doc_comments = true
 
 [bindings.kotlin]
-package_name = "ag.jup.jupiter.android.library.chainkit"
+package_name = "uniffi"
 generate_immutable_records = true
 android = true

@@ -20,4 +20,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ChainKit"
-include(":app")
+include(":chainkit")

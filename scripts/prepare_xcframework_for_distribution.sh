@@ -111,7 +111,7 @@ if gh release view "$RELEASE_TAG" --repo "$REPO" &> /dev/null; then
     
     # Upload the asset to the existing release
     echo "📤 Uploading asset to existing release..."
-    gh release upload "$RELEASE_TAG" "$ZIP_FILE" "platforms/android/app/build/outputs/aar/app-release.aar" --repo "$REPO" --clobber
+    gh release upload "$RELEASE_TAG" "$ZIP_FILE" "platforms/android/chainkit/build/outputs/aar/chainkit-release.aar" --repo "$REPO" --clobber
 else
     # Create a new release
     echo "🆕 Creating new release $RELEASE_TAG..."
@@ -130,7 +130,7 @@ else
         --title "$TITLE" \
         --notes "$NOTES" \
         "$ZIP_FILE"
-        "platforms/android/app/build/outputs/aar/app-release.aar"
+        "platforms/android/chainkit/build/outputs/aar/chainkit-release.aar"
 fi
 
 # Get the download URL
