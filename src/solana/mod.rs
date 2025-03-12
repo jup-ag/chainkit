@@ -94,9 +94,11 @@ impl PrivateKeyFactory for Factory {
 
         let seed = Seed::new(&mnemonic_phrase, passphrase.unwrap_or(""));
 
+        let derivation_path_format = derivation.derivation_path.format();
+
         for i in derivation.iter() {
             let derivation_path =
-                DerivationPath::from_absolute_path_str(format!("m/44'/501'/{}'/0'", i).as_str())
+                DerivationPath::from_absolute_path_str(format!("{}", derivation_path_format.replace("{}", &i.to_string())).as_str())
                     .map_err(KeyError::derivation)?;
 
             let keypair =

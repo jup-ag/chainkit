@@ -105,12 +105,28 @@ pub enum ChainNetwork {
     Testnet,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum DerivationPath {
+    Bip44,
+    Bip44Change,
+}
+
+impl DerivationPath {
+    pub fn format(&self) -> &str {
+        match self {
+            DerivationPath::Bip44 => "m/44'/501'/{}'/0'",
+            DerivationPath::Bip44Change => "m/44'/501'/{}'/0'/0'",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Derivation {
     pub start: u32,
     pub count: u32,
     pub account: u32,
     pub network: ChainNetwork,
+    pub derivation_path: DerivationPath,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
