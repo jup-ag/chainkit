@@ -230,7 +230,7 @@ bindgen-swift:
 # Use Uniffi to build the glue ChainKit.kt
 bindgen-kotlin:
 	@echo "------> Generating Kotlin bindings from UDL..."
-	cargo run --manifest-path Cargo.toml --features="uniffi/cli" --bin uniffi-bindgen generate src/interface.udl --language kotlin --out-dir platforms/android/app/src/main/java/ag/jup/jupiter/android/library/chainkit
+	cargo run --manifest-path Cargo.toml --features="uniffi/cli" --bin uniffi-bindgen generate src/interface.udl --language kotlin --out-dir platforms/android/app/src/main/java
 
 # Take the different targets, and put them into ChainKit.framework files per architecture
 assemble-frameworks:
