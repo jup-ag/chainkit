@@ -1,0 +1,32 @@
+------> Starting Android build...
+------> Configuration: --release, Folder: release
+------> NDK Version: 28.0.12433566, Platform: 28
+------> Building for architectures: i686-linux-android
+# Check Android SDK and install components if needed first
+------> Using Android SDK at /Users/kevin/Android/Sdk
+------> Using Android command line tools from /Users/kevin/Android/Sdk/cmdline-tools/latest
+------> Using Android NDK 28.0.12433566 from /Users/kevin/Android/Sdk/ndk/28.0.12433566
+# Ensure Rust is installed and in PATH
+------> Checking for Rust toolchain...
+------> Found Rust at standard location: /Users/kevin/.cargo/bin
+------> Exported Rust PATH: /Users/kevin/.cargo/bin
+------> Rust toolchain activated successfully
+------> Running tests...
+------> Found Rust at standard location: /Users/kevin/.cargo/bin
+------> Exported Rust PATH: /Users/kevin/.cargo/bin
+------> Rust toolchain activated successfully
+------> Building libraries...
+------> Found Rust at standard location: /Users/kevin/.cargo/bin
+------> Exported Rust PATH: /Users/kevin/.cargo/bin
+------> Rust toolchain activated successfully
+------> Creating directories...
+mkdir -p platforms/android/chainkit/src/main/jniLibs
+mkdir -p platforms/android/chainkit/src/main/jniLibs/arm64-v8a
+mkdir -p platforms/android/chainkit/src/main/jniLibs/armeabi-v7a
+mkdir -p platforms/android/chainkit/src/main/jniLibs/x86
+mkdir -p platforms/android/chainkit/src/main/jniLibs/x86_64
+------> Checking for built libraries...
+Expecting libraries for: i686-linux-android
+# Verify that all requested architectures built successfully
+❌ ERROR: i686-linux-android build not found
+make: *** [android] Error 1
