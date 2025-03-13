@@ -10,9 +10,13 @@ target
 # XCFramework handling
 platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework/*
 !platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework/Info.plist
+
 # Ignore framework zip files
 platforms/ios/ChainKit/Sources/ChainKitFFI-*.zip
 platforms/ios/ChainKit/Sources/*.zip
+
+# Ignore Android so files
+platforms/android/chainkit/src/main/jniLibs/**
 
 # Package.swift backup
 Package.swift.bak

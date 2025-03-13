@@ -1,39 +1,137 @@
 # ChainKit Release Process
 
-This document explains the simplified process for releasing the ChainKit framework using Swift Package Manager's remote binary target capability.
-
-## Overview
-
-The XCFramework can be packaged and uploaded to GitHub Releases in a single command. The process:
-
-1. Packages the XCFramework and creates a zip archive
-2. Uploads it to GitHub Releases with the specified version
-3. Automatically updates Package.swift with the new URL and checksum
+This document describes the release process for ChainKit, including how to create a new release with iOS XCFramework and Android AAR distributions.
 
 ## Prerequisites
 
-The XCFramework must be already built (by running `make apple`)
+### Rust Setup
 
-The release process automatically handles:
-- Installing GitHub CLI if needed
-- Authentication through your SSH credentials
-- Creating GitHub releases
-- Uploading the framework
-- Computing the checksum
-- Updating Package.swift
-
-## Release Process
-
-1. First build the framework if you haven't already:
+ChainKit uses Rust for its core functionality. The build system will automatically check for and set up Rust if needed, but you can also install it manually:
 
 ```bash
-make apple
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
 ```
 
-2. Then create and upload the release:
+### Android SDK Setup
+
+For Android builds, you need the Android SDK. The build system will automatically set up the necessary components, but you should set the `ANDROID_HOME` environment variable:
 
 ```bash
-make release VERSION=1.0.0
+export ANDROID_HOME=$HOME/Library/Android/sdk
+# Or wherever your Android SDK is installed
 ```
 
-That's it! The framework is now available for Swift Package Manager to download, and your Package.swift has been automatically updated with the correct URL and checksum.
+## Creating a New Release
+
+To create a new release, run:
+
+```bash
+make release VERSION=x.y.z
+```
+
+This will:
+
+1. Create a new GitHub release with the specified version
+2. Package and upload the iOS XCFramework to the release
+3. Package and upload the Android AAR to the release
+4. Publish the Android AAR to GitHub Packages
+
+## Release Scripts
+
+The release process is divided into three scripts:
+
+1. `scripts/create_github_release.sh` - Creates a new GitHub release
+2. `scripts/prepare_xcframework_for_distribution.sh` - Packages and uploads the iOS XCFramework
+3. `scripts/prepare_aar_for_distribution.sh` - Packages, uploads, and publishes the Android AAR
+
+You can run these scripts individually if needed, but normally they are called by the `make release` command.
+
+## Using the Android Library with GitHub Packages
+
+To use the Android library from GitHub Packages in your project:
+
+1. Add the GitHub Packages repository to your `settings.gradle.kts`:
+
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        // ... other repositories ...
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/jup-ag/chainkit")
+            credentials {
+                username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
+                password = project.findProperty("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
+```
+
+2. Add the dependency to your module's `build.gradle.kts`:
+
+```kotlin
+dependencies {
+    implementation("ag.jup.chainkit:chainkit:x.y.z")
+}
+```
+
+3. Make sure to provide GitHub credentials either through environment variables or Gradle properties.
+
+## Using the iOS Swift Package
+
+The release process automatically updates the `Package.swift` file with the latest version information. 
+
+To use the Swift Package in your project:
+
+1. In Xcode, go to File > Add Package Dependencies...
+2. Enter the repository URL: `https://github.com/jup-ag/chainkit`
+3. Choose the appropriate version constraint
+4. Select the ChainKit package and click Add Package
+
+## Troubleshooting
+
+### Rust Environment Issues
+
+The build system is designed to automatically detect and set up Rust if needed. If you encounter any issues with Rust commands not being found, you can:
+
+1. Manually install Rust:
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   source "$HOME/.cargo/env"
+   ```
+
+2. Ensure Rust is in your PATH:
+   ```bash
+   export PATH="$HOME/.cargo/bin:$PATH"
+   ```
+
+3. You can also run any of the make commands with an explicit PATH:
+   ```bash
+   PATH="$HOME/.cargo/bin:$PATH" make android
+   ```
+
+### Android SDK Issues
+
+If you encounter issues with the Android SDK:
+
+1. Make sure the ANDROID_HOME environment variable is set:
+   ```bash
+   export ANDROID_HOME=$HOME/Library/Android/sdk
+   ```
+
+2. You can specify NDK version explicitly:
+   ```bash
+   make android ANDROID_NDK_VERSION=28.0.12433566
+   ```
+
+3. For more verbose output during the build:
+   ```bash
+   CARGO_LOG=debug make android
+   ```
+
+> **Note**: All Android architectures (aarch64, armv7, i686, x86_64) must build successfully for 
+> the build process to complete. If you encounter build failures for specific architectures, 
+> you'll need to debug and resolve those issues. The build system is configured to fail if any
+> architecture fails to build to ensure consistent support across all target platforms.
