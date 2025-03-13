@@ -38,7 +38,8 @@ enum ChainNetwork {
 
 enum DerivationPath {
     "Bip44",
-    "Bip44Change"
+    "Bip44Change",
+    "Deprecated"
 };
 
 dictionary Derivation {

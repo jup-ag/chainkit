@@ -109,13 +109,15 @@ pub enum ChainNetwork {
 pub enum DerivationPath {
     Bip44,
     Bip44Change,
+    Deprecated
 }
 
 impl DerivationPath {
     pub fn format(&self) -> &str {
         match self {
-            DerivationPath::Bip44 => "m/44'/501'/{}'/0'",
-            DerivationPath::Bip44Change => "m/44'/501'/{}'/0'/0'",
+            DerivationPath::Bip44 => "m/44'/501'/{}'",
+            DerivationPath::Bip44Change => "m/44'/501'/{}'/0'",
+            DerivationPath::Deprecated => "m/501'/{}'/0/0",
         }
     }
 }

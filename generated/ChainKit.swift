@@ -1087,6 +1087,7 @@ public enum DerivationPath {
     
     case bip44
     case bip44Change
+    case deprecated
 }
 
 public struct FfiConverterTypeDerivationPath: FfiConverterRustBuffer {
@@ -1099,6 +1100,8 @@ public struct FfiConverterTypeDerivationPath: FfiConverterRustBuffer {
         case 1: return .bip44
         
         case 2: return .bip44Change
+        
+        case 3: return .deprecated
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -1114,6 +1117,10 @@ public struct FfiConverterTypeDerivationPath: FfiConverterRustBuffer {
         
         case .bip44Change:
             writeInt(&buf, Int32(2))
+        
+        
+        case .deprecated:
+            writeInt(&buf, Int32(3))
         
         }
     }

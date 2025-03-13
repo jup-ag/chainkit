@@ -6,7 +6,6 @@ use sha2::{Digest, Sha256};
 use solana_program::{instruction::Instruction, native_token::LAMPORTS_PER_SOL};
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction,
-    derivation_path::DerivationPath,
     hash,
     instruction::AccountMeta,
     message::VersionedMessage,
@@ -46,7 +45,7 @@ impl UtilsFactory for Factory {
             &self,
             length: u32
         ) -> Result<MnemonicWords, KeyError> {
-        
+
         // Ensure the mnemonic length is valid, for deriving we support only 12 and 24 words,
         // therefore for creating also gonna support only that
         let mnemonic_type = match length {
@@ -70,7 +69,7 @@ impl UtilsFactory for Factory {
             .split_whitespace()
             .map(String::from)
             .collect();
-    
+
         Ok(MnemonicWords { words })
     }
 }
@@ -98,7 +97,7 @@ impl PrivateKeyFactory for Factory {
 
         for i in derivation.iter() {
             let derivation_path =
-                DerivationPath::from_absolute_path_str(format!("{}", derivation_path_format.replace("{}", &i.to_string())).as_str())
+                solana_sdk::derivation_path::DerivationPath::from_absolute_path_str(format!("{}", derivation_path_format.replace("{}", &i.to_string())).as_str())
                     .map_err(KeyError::derivation)?;
 
             let keypair =
@@ -251,7 +250,7 @@ impl TransactionFactory for Factory {
                 .recent_blockhash
                 .parse::<hash::Hash>()
                 .map_err(TransactionError::parsing_failure)?;
-    
+
             versioned_transaction.message.set_recent_blockhash(recent_blockhash);
         }
 
@@ -350,7 +349,7 @@ impl TransactionFactory for Factory {
                             .recent_blockhash
                             .parse::<hash::Hash>()
                             .map_err(TransactionError::parsing_failure)?;
-                
+
                         versioned_transaction.message.set_recent_blockhash(recent_blockhash);
                     }
 
@@ -423,10 +422,10 @@ impl TransactionFactory for Factory {
                             .recent_blockhash
                             .parse::<hash::Hash>()
                             .map_err(TransactionError::parsing_failure)?;
-                
+
                         versioned_transaction.message.set_recent_blockhash(recent_blockhash);
-                    }    
-                
+                    }
+
                     let serialized_tx = bincode::serialize(&versioned_transaction)
                         .map_err(TransactionError::parsing_failure)?;
                     Ok(to_base64(serialized_tx))
@@ -1050,9 +1049,9 @@ mod tests {
     #[test]
     fn test_generate_mnemonic_12_words() {
         let result = Factory.generate_mnemonic(12);
-        
+
         assert!(result.is_ok(), "Expected mnemonic generation to succeed");
-        
+
         let mnemonic = result.unwrap();
         assert_eq!(mnemonic.words.len(), 12, "Expected 12 words in mnemonic");
     }
@@ -1060,9 +1059,9 @@ mod tests {
     #[test]
     fn test_generate_mnemonic_24_words() {
         let result = Factory.generate_mnemonic(24);
-        
+
         assert!(result.is_ok(), "Expected mnemonic generation to succeed");
-        
+
         let mnemonic = result.unwrap();
         assert_eq!(mnemonic.words.len(), 24, "Expected 24 words in mnemonic");
     }
@@ -1070,9 +1069,9 @@ mod tests {
     #[test]
     fn test_generate_mnemonic_invalid_length() {
         let result = Factory.generate_mnemonic(18);
-        
+
         assert!(result.is_err(), "Expected error for invalid mnemonic length");
-        
+
         if let Err(KeyError::InvalidMnemonic(msg)) = result {
             assert_eq!(msg, "Only 12 or 24 word mnemonics are supported");
         } else {
@@ -1118,6 +1117,7 @@ mod tests {
             count: 1,
             account: 0,
             network: ChainNetwork::Mainnet,
+            derivation_path: DerivationPath::Bip44Change
         };
 
         let sender = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1147,6 +1147,7 @@ mod tests {
             count: 2,
             account: 0,
             network: ChainNetwork::Mainnet,
+            derivation_path: DerivationPath::Bip44Change
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1167,6 +1168,7 @@ mod tests {
             count: 5,
             account: 0,
             network: ChainNetwork::Mainnet,
+            derivation_path: DerivationPath::Bip44Change
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1200,6 +1202,7 @@ mod tests {
             count: 2,
             account: 0,
             network: ChainNetwork::Mainnet,
+            derivation_path: DerivationPath::Bip44Change
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1226,6 +1229,7 @@ mod tests {
             count: 2,
             account: 0,
             network: ChainNetwork::Mainnet,
+            derivation_path: DerivationPath::Bip44Change
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
