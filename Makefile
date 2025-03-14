@@ -1,53 +1,307 @@
+################################################################################
 #
-# DEBUG: To run this makefile with a debug configuration, do:
-# 	make apple CONFIGURATION="" FOLDER="debug"
+# ChainKit Makefile
 #
-# DEFAULT: By default, it assumes a release configuration, which is:
-# 	make apple
+# Primary targets:
+#   make all      - Build both Apple and Android
+#   make apple    - Build Apple frameworks (iOS)
+#   make android  - Build Android libraries and AAR
+#   make clean    - Clean all build artifacts
+#   make release  - Create and upload a release (VERSION=x.y.z required)
 #
-# PROFILE: If you want to run the Xcode profiler (Instruments) you need to compile the x86_64 arch:
-# 	make profile CONFIGURATION="" FOLDER="debug"
-#
-# CLEAN: When switching between compiled archs (from 'apple' to 'profile' for example), you might need to clean first:
-# 	make clean
-#
+################################################################################
+
+################################################################################
+# COMMON CONFIGURATION
+################################################################################
+
+# Source the Rust environment
+RUST_ENV := source ./scripts/ensure_rust_env.sh
+
+# Default configuration
+CONFIGURATION ?= "--release"
+FOLDER ?= "release"
+STATIC_LIB_NAME := libchainkit.a
+
+# Apple configuration
+ENABLE_X86 ?= false
+ENABLE_SIMULATOR ?= true
+
+# Android configuration  
+ANDROID_HOME ?= $(HOME)/Library/Android/sdk
+ANDROID_NDK_VERSION ?= 28.0.12433566
+ANDROID_PLATFORM ?= 28
+ANDROID_NDK_HOME ?= $(ANDROID_HOME)/ndk/$(ANDROID_NDK_VERSION)
+ANDROID_CMDLINE_TOOLS_VERSION ?= 11076708
+ANDROID_CMDLINE_TOOLS_PATH ?= $(ANDROID_HOME)/cmdline-tools/latest
+ANDROID_ARCHS ?= aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+
+# Ensure directories exist
+$(shell mkdir -p platforms/ios)
+
+################################################################################
+# PRIMARY TARGETS
+################################################################################
 
 # Default target to build both Apple and Android
 .PHONY: all
 all: apple android
 
-STATIC_LIB_NAME := libchainkit.a
+# Build Apple frameworks
+.PHONY: apple
+apple:
+	@echo "------> Starting Apple build..."
+	@echo "------> Configuration: $(CONFIGURATION), Folder: $(FOLDER)"
+	@echo "------> ENABLE_X86: $(ENABLE_X86), ENABLE_SIMULATOR: $(ENABLE_SIMULATOR)"
+	@echo "------> Checking for Rust toolchain..."
+	@bash -c '$(RUST_ENV) && \
+		echo "------> Building framework targets..." && \
+		$(call build_apple_targets) && \
+		echo "------> Generating Swift bindings..." && \
+		cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/interface.udl --out-dir generated --language swift && \
+		if [ -f generated/ChainKitFFI.modulemap ]; then \
+			echo "------> Fixing modulemap..." && \
+			awk "{gsub(/module ChainKitFFI/, \"framework module ChainKitFFI\"); print}" generated/ChainKitFFI.modulemap > generated/ChainKitFFI.modulemap.new && \
+			mv generated/ChainKitFFI.modulemap.new generated/ChainKitFFI.modulemap && \
+			echo "Modulemap successfully updated."; \
+		else \
+			echo "Warning: modulemap file not found at generated/ChainKitFFI.modulemap"; \
+		fi && \
+		echo "------> Assembling frameworks..." && \
+		$(call assemble_apple_frameworks) && \
+		echo "------> Creating XCFramework..." && \
+		$(call create_xcframework) && \
+		echo "------> Copying framework to Swift Package..." && \
+		$(call copy_xcframework_to_package)'
+	@echo "------> Apple build completed successfully!"
 
-# Default be build a release configuration
-CONFIGURATION?="--release"
-# Default folder is release
-FOLDER?="release"
+# Build Android libraries and AAR
+.PHONY: android
+android:
+	@echo "------> Starting Android build..."
+	@echo "------> Configuration: $(CONFIGURATION), Folder: $(FOLDER)"
+	@echo "------> NDK Version: $(ANDROID_NDK_VERSION), Platform: $(ANDROID_PLATFORM)"
+	@echo "------> Building for architectures: $(ANDROID_ARCHS)"
+	
+	# Check Android SDK and install components
+	$(call check_android_sdk)
+	$(call check_android_cmdline_tools)
+	$(call check_android_ndk)
+	
+	@echo "------> Checking for Rust toolchain..."
+	bash -c '$(RUST_ENV) && \
+		echo "------> Adding Android targets..." && \
+		rustup target add $(ANDROID_ARCHS)'
+	
+	@echo "------> Running tests..."
+	bash -c '$(RUST_ENV) && cargo test'
+	
+	# Build the libraries
+	@echo "------> Building libraries..."
+	bash -c '$(RUST_ENV) && $(call build_android_libs)'
+	
+	# Create directories for libraries
+	@echo "------> Creating directories..."
+	mkdir -p platforms/android/chainkit/src/main/jniLibs
+	mkdir -p platforms/android/chainkit/src/main/jniLibs/arm64-v8a
+	mkdir -p platforms/android/chainkit/src/main/jniLibs/armeabi-v7a
+	mkdir -p platforms/android/chainkit/src/main/jniLibs/x86
+	mkdir -p platforms/android/chainkit/src/main/jniLibs/x86_64
+	
+	# Copy libraries to appropriate directories
+	@echo "------> Copying libraries..."
+	cp target/aarch64-linux-android/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/arm64-v8a/libuniffi_ChainKit.so
+	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/arm64-v8a/libc++_shared.so
+	cp target/armv7-linux-androideabi/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/armeabi-v7a/libuniffi_ChainKit.so
+	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/armeabi-v7a/libc++_shared.so
+	cp target/i686-linux-android/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/x86/libuniffi_ChainKit.so
+	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/i686-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/x86/libc++_shared.so
+	cp target/x86_64-linux-android/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/x86_64/libuniffi_ChainKit.so
+	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/x86_64/libc++_shared.so
+	
+	# Generate Kotlin bindings
+	@echo "------> Generating Kotlin bindings..."
+	bash -c '$(RUST_ENV) && cargo run --manifest-path Cargo.toml --features="uniffi/cli" --bin uniffi-bindgen generate src/interface.udl --language kotlin --out-dir platforms/android/chainkit/src/main/java'
+	@echo "------> Kotlin bindings generated successfully!"
+	
+	# Build AAR
+	@echo "------> Building Android AAR with Gradle..."
+	@if [ -n "$(ANDROID_HOME)" ]; then \
+		$(ANDROID_HOME)/cmdline-tools/latest/bin/sdkmanager --licenses || echo "Please accept all licenses manually for this build to succeed"; \
+	fi
+	@cd platforms/android && ./gradlew chainkit:assembleRelease
+	@echo "------> Android AAR built successfully at platforms/android/chainkit/build/outputs/aar/chainkit-release.aar"
+	
+	@echo "------> Android build completed successfully!"
 
-# x86_64 arch is needed to run the Xcode profiler (Instruments) on the simulator
-# it's disabled by default to improve compile time in our fat binary
-ENABLE_X86?=false
+# Clean all build artifacts
+.PHONY: clean
+clean:
+	@echo "------> Cleaning build artifacts..."
+	@bash -c '$(RUST_ENV) && cargo clean'
+	rm -rf generated
+	rm -f platforms/ios/ChainKit/Sources/ChainKit.swift
+	rm -rf platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework
+	rm -rf platforms/android/chainkit/src/main/jniLibs
+	@echo "------> Clean completed successfully!"
 
-# Should we also build for simulator? Enabled by default but disabled on CI
-ENABLE_SIMULATOR?=true
+# Release a version
+.PHONY: release
+release:
+	@echo "------> Creating and uploading release with version $(VERSION)"
+	@if [ -z "$(VERSION)" ]; then \
+		echo "ERROR: VERSION not specified"; \
+		echo "Usage: make release VERSION=x.y.z"; \
+		exit 1; \
+	fi
+	@echo "------> Android architectures: $(ANDROID_ARCHS)"
+	@echo "------> NOTE: All architectures must build successfully for the release to complete."
+	@echo "------> Checking for Rust toolchain..."
+	@bash -c '$(RUST_ENV) && \
+	echo "------> Creating GitHub release..." && \
+	./scripts/create_github_release.sh $(VERSION) && \
+	echo "------> Preparing and uploading XCFramework..." && \
+	./scripts/prepare_xcframework_for_distribution.sh $(VERSION) && \
+	echo "------> Preparing and uploading Android AAR..." && \
+	./scripts/prepare_aar_for_distribution.sh $(VERSION)'
+	@echo "------> Release v$(VERSION) completed!"
 
-# Define the path to the package framework directory
-PACKAGE_FRAMEWORK_PATH=platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework
+################################################################################
+# UTILITY FUNCTIONS
+################################################################################
 
-# Android SDK path (can be overridden via environment variable)
-ANDROID_HOME?=$(HOME)/Library/Android/sdk
-# Android NDK version
-ANDROID_NDK_VERSION?=28.0.12433566
-# Android platform target
-ANDROID_PLATFORM?=24
-# Android NDK Path
-ANDROID_NDK_HOME?=$(ANDROID_HOME)/ndk/$(ANDROID_NDK_VERSION)
-# Android command line tools version
-ANDROID_CMDLINE_TOOLS_VERSION?=11076708
-# Android command line tools latest path
-ANDROID_CMDLINE_TOOLS_PATH?=$(ANDROID_HOME)/cmdline-tools/latest
+# Build targets for all Apple architectures
+define build_apple_targets
+	echo "------> Building for architectures..."; \
+	echo "------> Checking for installed Rust targets..."; \
+	rustup target list --installed; \
+	echo "------> Installing required targets..."; \
+	rustup target add aarch64-apple-ios; \
+	if $(ENABLE_SIMULATOR); then \
+		echo "------> Installing simulator target..."; \
+		rustup target add aarch64-apple-ios-sim; \
+	fi; \
+	if $(ENABLE_X86); then \
+		echo "------> Installing x86_64 target..."; \
+		rustup target add x86_64-apple-ios; \
+	fi; \
+	echo "------> Building for aarch64-apple-ios..."; \
+	cargo build $(CONFIGURATION) --target aarch64-apple-ios || { echo "❌ Failed to build aarch64-apple-ios target"; exit 1; }; \
+	if $(ENABLE_SIMULATOR); then \
+		echo "------> Building for aarch64-apple-ios-sim..."; \
+		cargo build $(CONFIGURATION) --target aarch64-apple-ios-sim || { echo "❌ Failed to build aarch64-apple-ios-sim target"; exit 1; }; \
+	fi; \
+	if $(ENABLE_X86); then \
+		echo "------> Building for x86_64-apple-ios..."; \
+		cargo build $(CONFIGURATION) --target x86_64-apple-ios || { echo "❌ Failed to build x86_64-apple-ios target"; exit 1; }; \
+	fi; \
+	echo "------> All targets built successfully!"
+endef
 
-# Ensure ios directory exists
-$(shell mkdir -p platforms/ios)
+# Assemble frameworks for each architecture
+define assemble_apple_frameworks
+	echo "------> Removing existing frameworks..."; \
+	find . -type d -name ChainKitFFI.framework -exec rm -rf {} \; 2>/dev/null || echo "No existing frameworks found"; \
+	echo "------> Checking for static libraries..."; \
+	echo "------> Looking for iOS static library at: target/aarch64-apple-ios/$(FOLDER)/$(STATIC_LIB_NAME)"; \
+	ls -la target/aarch64-apple-ios/$(FOLDER)/$(STATIC_LIB_NAME) || echo "❌ ERROR: iOS static library not found"; \
+	if $(ENABLE_SIMULATOR); then \
+		echo "------> Looking for simulator static library at: target/aarch64-apple-ios-sim/$(FOLDER)/$(STATIC_LIB_NAME)"; \
+		ls -la target/aarch64-apple-ios-sim/$(FOLDER)/$(STATIC_LIB_NAME) || echo "❌ ERROR: simulator static library not found"; \
+	fi; \
+	if $(ENABLE_X86); then \
+		echo "------> Looking for x86_64 static library at: target/x86_64-apple-ios/$(FOLDER)/$(STATIC_LIB_NAME)"; \
+		ls -la target/x86_64-apple-ios/$(FOLDER)/$(STATIC_LIB_NAME) || echo "❌ ERROR: x86_64 static library not found"; \
+	fi; \
+	echo "------> Checking for generated files..."; \
+	ls -la generated/ || echo "❌ ERROR: Generated files not found"; \
+	echo "------> Checking for resources..."; \
+	ls -la resources/ || echo "❌ ERROR: Resource files not found"; \
+	ROOT_DIR=$$(pwd); \
+	if $(ENABLE_X86) && [ -f "target/x86_64-apple-ios/$(FOLDER)/$(STATIC_LIB_NAME)" ]; then \
+		echo "------> Assembling x86_64 framework..."; \
+		cd target/x86_64-apple-ios/$(FOLDER) && mkdir -p ChainKitFFI.framework && cd ChainKitFFI.framework && \
+			mkdir -p Headers Modules && cp $$ROOT_DIR/generated/ChainKitFFI.modulemap ./Modules/module.modulemap && \
+			cp $$ROOT_DIR/generated/ChainKitFFI.h ./Headers/ChainKitFFI.h && cp ../$(STATIC_LIB_NAME) ./ChainKitFFI && \
+			cp $$ROOT_DIR/resources/Info.plist ./ && \
+			echo "✅ Successfully created x86_64 framework"; \
+		cd $$ROOT_DIR; \
+	fi; \
+	if $(ENABLE_SIMULATOR) && [ -f "target/aarch64-apple-ios-sim/$(FOLDER)/$(STATIC_LIB_NAME)" ]; then \
+		echo "------> Assembling simulator framework..."; \
+		cd target/aarch64-apple-ios-sim/$(FOLDER) && mkdir -p ChainKitFFI.framework && cd ChainKitFFI.framework && \
+			mkdir -p Headers Modules Resources && cp $$ROOT_DIR/generated/ChainKitFFI.modulemap ./Modules/module.modulemap && \
+			cp $$ROOT_DIR/generated/ChainKitFFI.h ./Headers/ChainKitFFI.h && cp ../$(STATIC_LIB_NAME) ./ChainKitFFI && \
+			cp $$ROOT_DIR/resources/Info.plist ./ && cp $$ROOT_DIR/resources/Info.plist ./Resources && \
+			echo "✅ Successfully created simulator framework"; \
+		cd $$ROOT_DIR; \
+	fi; \
+	echo "------> Assembling iOS framework..."; \
+	echo "------> Current directory: $$(pwd)"; \
+	echo "------> Checking iOS static library:"; \
+	ls -la target/aarch64-apple-ios/$(FOLDER)/$(STATIC_LIB_NAME); \
+	mkdir -p target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework/Headers; \
+	mkdir -p target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework/Modules; \
+	cp generated/ChainKitFFI.modulemap target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework/Modules/module.modulemap; \
+	cp generated/ChainKitFFI.h target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework/Headers/; \
+	cp target/aarch64-apple-ios/$(FOLDER)/$(STATIC_LIB_NAME) target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI; \
+	cp resources/Info.plist target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework/; \
+	echo "✅ Successfully created iOS framework"; \
+	echo "------> Frameworks assembled. Checking..."; \
+	find . -name "ChainKitFFI.framework" | sort
+endef
+
+# Create XCFramework from component frameworks
+define create_xcframework
+	echo "------> Creating XCFramework..."; \
+	rm -rf target/ChainKitFFI.xcframework || echo "skip removing"; \
+	echo "------> Combining targets for XCFramework..."; \
+	mkdir -p target/ChainKitFFI.xcframework; \
+	echo "------> ENABLE_X86 set to: $(ENABLE_X86)"; \
+	echo "------> ENABLE_SIMULATOR set to: $(ENABLE_SIMULATOR)"; \
+	if [ -d "target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework" ]; then \
+		if $(ENABLE_X86) || $(ENABLE_SIMULATOR); then \
+			if $(ENABLE_X86) && [ -d "target/x86_64-apple-ios/$(FOLDER)/ChainKitFFI.framework" ] && [ -d "target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework" ]; then \
+				echo "------> Creating fat binary with x86_64 and arm64 simulator..."; \
+				lipo -create \
+					target/x86_64-apple-ios/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI \
+					target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI \
+					-output target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI; \
+			elif [ -d "target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework" ]; then \
+				echo "------> Creating simulator binary..."; \
+				lipo -create \
+					target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI \
+					-output target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI; \
+			fi; \
+			if [ -d "target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework" ]; then \
+				echo "------> Creating XCFramework with device and simulator..."; \
+				xcodebuild -create-xcframework \
+					-framework target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework \
+					-framework target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework \
+					-output target/ChainKitFFI.xcframework; \
+			else \
+				echo "------> Creating XCFramework with device only (simulator not found)..."; \
+				xcodebuild -create-xcframework \
+					-framework target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework \
+					-output target/ChainKitFFI.xcframework; \
+			fi; \
+		else \
+			echo "------> Creating XCFramework with device only..."; \
+			xcodebuild -create-xcframework \
+				-framework target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework \
+				-output target/ChainKitFFI.xcframework; \
+		fi; \
+	fi
+endef
+
+# Copy the XCFramework to the Swift Package
+define copy_xcframework_to_package
+	echo "------> Copying XCFramework to Swift Package..."; \
+	mkdir -p platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework; \
+	rsync -a target/ChainKitFFI.xcframework/ platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework/ || true; \
+	echo "------> Copying Swift bindings to Swift Package..."; \
+	cp generated/ChainKit.swift platforms/ios/ChainKit/Sources/ 2>/dev/null || touch platforms/ios/ChainKit/Sources/ChainKit.swift
+endef
 
 # Check if Android SDK is installed
 define check_android_sdk
@@ -102,211 +356,19 @@ define check_android_ndk
 	fi
 endef
 
-apple:
-	@echo "------> Starting Apple build..."
-	@echo "------> Configuration: $(CONFIGURATION), Folder: $(FOLDER)"
-	@echo "------> ENABLE_X86: $(ENABLE_X86), ENABLE_SIMULATOR: $(ENABLE_SIMULATOR)"
-	$(MAKE) build-framework
-	@echo "------> Apple build completed successfully!"
-
-# Target for releasing a version
-release:
-	@echo "------> Creating and uploading release with version $(VERSION)"
-	@if [ -z "$(VERSION)" ]; then \
-		echo "ERROR: VERSION not specified"; \
-		echo "Usage: make release VERSION=x.y.z"; \
-		exit 1; \
-	fi
-	@echo "------> Creating release package and uploading to GitHub..."
-	@./scripts/prepare_xcframework_for_distribution.sh $(VERSION)
-	@echo "------> Release v$(VERSION) completed!"
-
-profile:
-	@echo "------> Starting Apple profile build with x86_64 support..."
-	$(MAKE) -e ENABLE_X86=1 build-framework
-	@echo "------> Apple profile build completed successfully!"
-
-# Android build target
-android:
-	@echo "------> Starting Android build..."
-	@echo "------> Configuration: $(CONFIGURATION), Folder: $(FOLDER)"
-	@echo "------> NDK Version: $(ANDROID_NDK_VERSION), Platform: $(ANDROID_PLATFORM)"
-	
-	# Check Android SDK and install components if needed
-	$(call check_android_sdk)
-	$(call check_android_cmdline_tools)
-	$(call check_android_ndk)
-	
-	@echo "------> Adding Android targets..."
-	rustup target add \
-		aarch64-linux-android \
-		armv7-linux-androideabi \
-		i686-linux-android \
-		x86_64-linux-android
-	
-	@echo "------> Running tests..."
-	cargo test
-	
-	@echo "------> Cleaning..."
-	cargo clean
-	
-	@echo "------> Building libraries..."
+# Build Android libraries
+define build_android_libs
+	set -x && \
 	CARGO_PROFILE_RELEASE_STRIP=$(if $(findstring release,$(FOLDER)),true,false) \
 	ANDROID_NDK_HOME=$(ANDROID_NDK_HOME) \
 	cargo \
+		--verbose \
 		--config target.x86_64-linux-android.linker=\"$(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/bin/x86_64-linux-android$(ANDROID_PLATFORM)-clang\" \
 		--config target.i686-linux-android.linker=\"$(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/bin/i686-linux-android$(ANDROID_PLATFORM)-clang\" \
 		--config target.armv7-linux-androideabi.linker=\"$(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/bin/armv7a-linux-androideabi$(ANDROID_PLATFORM)-clang\" \
 		--config target.aarch64-linux-android.linker=\"$(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/bin/aarch64-linux-android$(ANDROID_PLATFORM)-clang\" \
 		ndk \
 		--platform $(ANDROID_PLATFORM) \
-		--target aarch64-linux-android \
-		--target armv7-linux-androideabi \
-		--target i686-linux-android \
-		--target x86_64-linux-android \
-		build $(CONFIGURATION)
-	
-	@echo "------> Creating directories..."
-	mkdir -p platforms/android/chainkit/src/main/jniLibs
-	mkdir -p platforms/android/chainkit/src/main/jniLibs/arm64-v8a
-	mkdir -p platforms/android/chainkit/src/main/jniLibs/armeabi-v7a
-	mkdir -p platforms/android/chainkit/src/main/jniLibs/x86
-	mkdir -p platforms/android/chainkit/src/main/jniLibs/x86_64
-	
-	@echo "------> Copying libraries..."
-	cp target/aarch64-linux-android/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/arm64-v8a/libuniffi_ChainKit.so
-	cp target/armv7-linux-androideabi/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/armeabi-v7a/libuniffi_ChainKit.so
-	cp target/i686-linux-android/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/x86/libuniffi_ChainKit.so
-	cp target/x86_64-linux-android/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/x86_64/libuniffi_ChainKit.so
-	
-	@echo "------> Copying shared libraries..."
-	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/arm64-v8a/libc++_shared.so
-	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/armeabi-v7a/libc++_shared.so
-	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/i686-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/x86/libc++_shared.so
-	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/x86_64/libc++_shared.so
-	
-	@echo "------> Android build completed successfully!"
-
-build-framework:
-	@echo "------> Building framework targets..."
-	@make build-targets
-	@echo "------> Generating Swift bindings..."
-	@make bindgen-swift
-	@echo "------> Assembling frameworks..."
-	@make assemble-frameworks
-	@echo "------> Creating XCFramework..."
-	@make xcframework
-	@echo "------> Copying framework to Swift Package..."
-	@make cp-xcframework-source
-	@echo "------> Applying Swift linting fixes..."
-	@make apple-swiftlint
-
-clean:
-	@echo "------> Cleaning build artifacts..."
-	cargo clean
-	rm -rf generated
-	rm -f platforms/ios/ChainKit/Sources/ChainKit/ChainKit.swift
-	rm -rf platforms/ios/ChainKit/Sources/ChainKitFFI.xcframework
-	rm -rf platforms/android/chainkit/src/main/jniLibs
-	@echo "------> Clean completed successfully!"
-
-# Build targets for all architectures
-build-targets:
-	@echo "------> Building for architectures..."
-	if $(ENABLE_X86); then echo "------> Building for x86_64-apple-ios..."; cargo build $(CONFIGURATION) --target x86_64-apple-ios; fi
-	if $(ENABLE_SIMULATOR); then echo "------> Building for aarch64-apple-ios-sim..."; cargo build $(CONFIGURATION) --target aarch64-apple-ios-sim; fi
-	@echo "------> Building for aarch64-apple-ios..."
-	cargo build $(CONFIGURATION) --target aarch64-apple-ios
-
-# Use Uniffi to build the glue ChainKit.swift as well as the Modulemap
-bindgen-swift:
-	@echo "------> Generating Swift bindings from UDL..."
-	cargo run --features=uniffi/cli --bin uniffi-bindgen generate src/interface.udl --out-dir generated --language swift
-	@echo "------> Fixing modulemap..."
-	sed -i '' 's/module\ ChainKitFFI/framework\ module\ ChainKitFFI/' generated/ChainKitFFI.modulemap
-
-bindgen-kotlin:
-	@echo "------> Generating Kotlin bindings from UDL..."
-	uniffi-bindgen generate src/hello.udl --language kotlin -o platforms/android/UniffiRustExample/app/src/main/java
-	@echo "------> Fixing Kotlin bindings..."
-	sed -i '' 's/return "uniffi_Hello"/return "hello"/' platforms/android/UniffiRustExample/app/src/main/java/uniffi/Hello/Hello.kt
-
-# Take the different targets, and put them into ChainKit.framework files per architecture
-assemble-frameworks:
-	@echo "------> Removing existing frameworks..."
-	find . -type d -name ChainKitFFI.framework -exec rm -rf {} \; || echo "rm failed"
-	if ${ENABLE_X86}; then \
-		@echo "------> Assembling x86_64 framework..."; \
-		cd target/x86_64-apple-ios/$(FOLDER) && mkdir -p ChainKitFFI.framework && cd ChainKitFFI.framework && \
-			mkdir Headers Modules && cp ../../../../generated/ChainKitFFI.modulemap ./Modules/module.modulemap && \
-			cp ../../../../generated/ChainKitFFI.h ./Headers/ChainKitFFI.h && cp ../$(STATIC_LIB_NAME) ./ChainKitFFI && \
-			cp ../../../../resources/Info.plist ./; \
-	fi;
-	if ${ENABLE_SIMULATOR}; then \
-		@echo "------> Assembling simulator framework..."; \
-	  cd target/aarch64-apple-ios-sim/$(FOLDER) && mkdir -p ChainKitFFI.framework && cd ChainKitFFI.framework && \
-	  	mkdir Headers Modules Resources && cp ../../../../generated/ChainKitFFI.modulemap ./Modules/module.modulemap && \
-	  	cp ../../../../generated/ChainKitFFI.h ./Headers/ChainKitFFI.h && cp ../$(STATIC_LIB_NAME) ./ChainKitFFI && \
-	  	cp ../../../../resources/Info.plist ./ && cp ../../../../resources/Info.plist ./Resources; \
-	fi;
-	@echo "------> Assembling iOS framework..."
-	cd target/aarch64-apple-ios/$(FOLDER) && mkdir -p ChainKitFFI.framework && cd ChainKitFFI.framework && \
-		mkdir Headers Modules && cp ../../../../generated/ChainKitFFI.modulemap ./Modules/module.modulemap && \
-		cp ../../../../generated/ChainKitFFI.h ./Headers/ChainKitFFI.h && cp ../$(STATIC_LIB_NAME) ./ChainKitFFI && \
-		cp ../../../../resources/Info.plist ./;
-
-xcframework:
-	@echo "------> Creating XCFramework..."
-	rm -rf target/ChainKitFFI.xcframework || echo "skip removing"
-	$(call combine_targets)
-
-# Copy the xcframework and the source into the Swift Package folder
-cp-xcframework-source:
-	@echo "------> Creating Swift Package directories..."
-	mkdir -p platforms/ios/ChainKit/Sources
-	@echo "------> Copying XCFramework to Swift Package..."
-	cp -r target/ChainKitFFI.xcframework platforms/ios/ChainKit/Sources/
-	@echo "------> Copying Swift bindings to Swift Package..."
-	cp generated/ChainKit.swift platforms/ios/ChainKit/Sources/ChainKit
-
-# Fix the generated sourcecode so that our linter doesn't complain
-apple-swiftlint:
-	@echo "------> Applying Swift linting fixes..."
-	python3 resources/mutations.py
-
-fuck:
-	$(call combine_targets)
-
-# Based on the environment variables, either build
-# - Simulator
-# - X86
-# - Arch64
-define combine_targets
-	@echo "------> Combining targets for XCFramework..."
-	@echo "------> ENABLE_X86 set to: $(ENABLE_X86)"
-	@echo "------> ENABLE_SIMULATOR set to: $(ENABLE_SIMULATOR)"
-	if ${ENABLE_X86} || ${ENABLE_SIMULATOR}; then \
-		if ${ENABLE_X86}; then \
-		  @echo "------> Creating fat binary with x86_64 and arm64 simulator..."; \
-		  lipo -create \
-		    target/x86_64-apple-ios/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI \
-		  	target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI \
-		  	-output target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI; \
-		else \
-		  @echo "------> Creating simulator binary..."; \
-		  lipo -create \
-			  target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI \
-				-output target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI; \
-		fi; \
-		@echo "------> Creating XCFramework with device and simulator..."; \
-	  xcodebuild -create-xcframework \
-		  -framework target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework \
-			-framework target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework \
-			-output target/ChainKitFFI.xcframework; \
-	else \
-	  @echo "------> Creating XCFramework with device only..."; \
-	  xcodebuild -create-xcframework \
-		  -framework target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework \
-			-output target/ChainKitFFI.xcframework; \
-	fi;
+		$(addprefix --target ,$(ANDROID_ARCHS)) \
+		build $(CONFIGURATION) || { echo "❌ ERROR: Cargo build failed with exit code $$?"; exit 1; }
 endef
