@@ -100,13 +100,8 @@ pub enum Blockchain {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum ChainNetwork {
-    Mainnet,
-    Testnet,
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum DerivationPath {
+    Bip44Root,
     Bip44,
     Bip44Change,
     Deprecated
@@ -115,6 +110,7 @@ pub enum DerivationPath {
 impl DerivationPath {
     pub fn format(&self) -> &str {
         match self {
+            DerivationPath::Bip44Root => "m/44'/501'",
             DerivationPath::Bip44 => "m/44'/501'/{}'",
             DerivationPath::Bip44Change => "m/44'/501'/{}'/0'",
             DerivationPath::Deprecated => "m/501'/{}'/0/0",
@@ -126,9 +122,27 @@ impl DerivationPath {
 pub struct Derivation {
     pub start: u32,
     pub count: u32,
-    pub account: u32,
-    pub network: ChainNetwork,
-    pub derivation_path: DerivationPath,
+    pub path: DerivationPath,
+}
+
+impl Derivation {
+    pub fn paths(&self) -> Vec<String> {
+        let mut paths = Vec::new();
+
+        match self.path {
+            DerivationPath::Bip44Root => {
+                paths.push(self.path.format().to_string())
+            },
+            _ => {
+                for i in self.start..self.start + self.count {
+                    let path = format!("{}", self.path.format().replace("{}", &i.to_string()));
+                    paths.push(path);
+                }
+            }
+        }
+
+        paths
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

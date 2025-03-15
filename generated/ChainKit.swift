@@ -671,23 +671,17 @@ public func FfiConverterTypeDecimalNumber_lower(_ value: DecimalNumber) -> RustB
 public struct Derivation {
     public var start: UInt32
     public var count: UInt32
-    public var account: UInt32
-    public var network: ChainNetwork
-    public var derivationPath: DerivationPath
+    public var path: DerivationPath
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(
         start: UInt32, 
         count: UInt32, 
-        account: UInt32, 
-        network: ChainNetwork, 
-        derivationPath: DerivationPath) {
+        path: DerivationPath) {
         self.start = start
         self.count = count
-        self.account = account
-        self.network = network
-        self.derivationPath = derivationPath
+        self.path = path
     }
 }
 
@@ -700,13 +694,7 @@ extension Derivation: Equatable, Hashable {
         if lhs.count != rhs.count {
             return false
         }
-        if lhs.account != rhs.account {
-            return false
-        }
-        if lhs.network != rhs.network {
-            return false
-        }
-        if lhs.derivationPath != rhs.derivationPath {
+        if lhs.path != rhs.path {
             return false
         }
         return true
@@ -715,9 +703,7 @@ extension Derivation: Equatable, Hashable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(start)
         hasher.combine(count)
-        hasher.combine(account)
-        hasher.combine(network)
-        hasher.combine(derivationPath)
+        hasher.combine(path)
     }
 }
 
@@ -728,18 +714,14 @@ public struct FfiConverterTypeDerivation: FfiConverterRustBuffer {
             try Derivation(
                 start: FfiConverterUInt32.read(from: &buf), 
                 count: FfiConverterUInt32.read(from: &buf), 
-                account: FfiConverterUInt32.read(from: &buf), 
-                network: FfiConverterTypeChainNetwork.read(from: &buf), 
-                derivationPath: FfiConverterTypeDerivationPath.read(from: &buf)
+                path: FfiConverterTypeDerivationPath.read(from: &buf)
         )
     }
 
     public static func write(_ value: Derivation, into buf: inout [UInt8]) {
         FfiConverterUInt32.write(value.start, into: &buf)
         FfiConverterUInt32.write(value.count, into: &buf)
-        FfiConverterUInt32.write(value.account, into: &buf)
-        FfiConverterTypeChainNetwork.write(value.network, into: &buf)
-        FfiConverterTypeDerivationPath.write(value.derivationPath, into: &buf)
+        FfiConverterTypeDerivationPath.write(value.path, into: &buf)
     }
 }
 
@@ -1031,60 +1013,9 @@ extension Blockchain: Equatable, Hashable {}
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
-public enum ChainNetwork {
-    
-    case mainnet
-    case testnet
-}
-
-public struct FfiConverterTypeChainNetwork: FfiConverterRustBuffer {
-    typealias SwiftType = ChainNetwork
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ChainNetwork {
-        let variant: Int32 = try readInt(&buf)
-        switch variant {
-        
-        case 1: return .mainnet
-        
-        case 2: return .testnet
-        
-        default: throw UniffiInternalError.unexpectedEnumCase
-        }
-    }
-
-    public static func write(_ value: ChainNetwork, into buf: inout [UInt8]) {
-        switch value {
-        
-        
-        case .mainnet:
-            writeInt(&buf, Int32(1))
-        
-        
-        case .testnet:
-            writeInt(&buf, Int32(2))
-        
-        }
-    }
-}
-
-
-public func FfiConverterTypeChainNetwork_lift(_ buf: RustBuffer) throws -> ChainNetwork {
-    return try FfiConverterTypeChainNetwork.lift(buf)
-}
-
-public func FfiConverterTypeChainNetwork_lower(_ value: ChainNetwork) -> RustBuffer {
-    return FfiConverterTypeChainNetwork.lower(value)
-}
-
-
-extension ChainNetwork: Equatable, Hashable {}
-
-
-
-// Note that we don't yet support `indirect` for enums.
-// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 public enum DerivationPath {
     
+    case bip44Root
     case bip44
     case bip44Change
     case deprecated
@@ -1097,11 +1028,13 @@ public struct FfiConverterTypeDerivationPath: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .bip44
+        case 1: return .bip44Root
         
-        case 2: return .bip44Change
+        case 2: return .bip44
         
-        case 3: return .deprecated
+        case 3: return .bip44Change
+        
+        case 4: return .deprecated
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -1111,16 +1044,20 @@ public struct FfiConverterTypeDerivationPath: FfiConverterRustBuffer {
         switch value {
         
         
-        case .bip44:
+        case .bip44Root:
             writeInt(&buf, Int32(1))
         
         
-        case .bip44Change:
+        case .bip44:
             writeInt(&buf, Int32(2))
         
         
-        case .deprecated:
+        case .bip44Change:
             writeInt(&buf, Int32(3))
+        
+        
+        case .deprecated:
+            writeInt(&buf, Int32(4))
         
         }
     }

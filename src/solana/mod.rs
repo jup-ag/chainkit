@@ -93,15 +93,13 @@ impl PrivateKeyFactory for Factory {
 
         let seed = Seed::new(&mnemonic_phrase, passphrase.unwrap_or(""));
 
-        let derivation_path_format = derivation.derivation_path.format();
-
-        for i in derivation.iter() {
-            let derivation_path =
-                solana_sdk::derivation_path::DerivationPath::from_absolute_path_str(format!("{}", derivation_path_format.replace("{}", &i.to_string())).as_str())
+        for (index, path_string) in derivation.paths().iter().enumerate() {
+            let path =
+                solana_sdk::derivation_path::DerivationPath::from_absolute_path_str(path_string)
                     .map_err(KeyError::derivation)?;
 
             let keypair =
-                keypair_from_seed_and_derivation_path(seed.as_bytes(), Some(derivation_path))
+                keypair_from_seed_and_derivation_path(seed.as_bytes(), Some(path))
                     .map_err(|e| KeyError::Generic(format!("Invalid Keypair: {e:?}")))?;
             let key = DerivedPrivateKey {
                 contents: keypair.to_base58_string(),
@@ -109,7 +107,7 @@ impl PrivateKeyFactory for Factory {
                     contents: keypair.pubkey().to_string(),
                     chain: Blockchain::Solana,
                 },
-                index: i,
+                index: index as u32,
             };
 
             keys.push(key)
@@ -1093,6 +1091,35 @@ mod tests {
     }
 
     #[test]
+    fn test_bip44_root_derivation() {
+        let mnemonic = MnemonicWords::from_str(
+            "miracle pizza supply useful steak border same again youth silver access hundred",
+        )
+        .unwrap();
+
+        let derivation = Derivation {
+            start: 0,
+            count: 1,
+            path: DerivationPath::Bip44Root
+        };
+
+        let sender = Factory.derive(mnemonic, None, derivation).unwrap();
+
+        let key = ChainPrivateKey {
+            contents: sender[0].contents.to_owned(),
+            public_key: ChainPublicKey {
+                contents: sender[0].public_key.contents.to_owned(),
+                chain: Blockchain::Solana,
+            },
+        };
+
+        assert_eq!(
+            key.public_key.contents,
+            "9nNwJNeJnQmduBZZzYP717LRF8ExHT4GAa5Y6TktWgQq"
+        );
+    }
+
+    #[test]
     fn create_2022_is_valid() {
         let m = create_associated_token_account(
             &spl_associated_token_account::id(),
@@ -1115,9 +1142,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 1,
-            account: 0,
-            network: ChainNetwork::Mainnet,
-            derivation_path: DerivationPath::Bip44Change
+            path: DerivationPath::Bip44Change
         };
 
         let sender = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1145,9 +1170,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 2,
-            account: 0,
-            network: ChainNetwork::Mainnet,
-            derivation_path: DerivationPath::Bip44Change
+            path: DerivationPath::Bip44Change
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1166,9 +1189,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 5,
-            account: 0,
-            network: ChainNetwork::Mainnet,
-            derivation_path: DerivationPath::Bip44Change
+            path: DerivationPath::Bip44Change
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1200,9 +1221,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 2,
-            account: 0,
-            network: ChainNetwork::Mainnet,
-            derivation_path: DerivationPath::Bip44Change
+            path: DerivationPath::Bip44Change
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1227,9 +1246,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 2,
-            account: 0,
-            network: ChainNetwork::Mainnet,
-            derivation_path: DerivationPath::Bip44Change
+            path: DerivationPath::Bip44Change
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();

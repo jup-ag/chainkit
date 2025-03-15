@@ -31,12 +31,8 @@ enum Blockchain {
   "Solana"
 };
 
-enum ChainNetwork {
-  "Mainnet",
-  "Testnet"
-};
-
 enum DerivationPath {
+    "Bip44Root",
     "Bip44",
     "Bip44Change",
     "Deprecated"
@@ -45,9 +41,7 @@ enum DerivationPath {
 dictionary Derivation {
   u32 start;
   u32 count;
-  u32 account;
-  ChainNetwork network;
-  DerivationPath derivation_path;
+  DerivationPath path;
 };
 
 dictionary MnemonicWords {
