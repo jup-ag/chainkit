@@ -6,7 +6,6 @@ use sha2::{Digest, Sha256};
 use solana_program::{instruction::Instruction, native_token::LAMPORTS_PER_SOL};
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction,
-    derivation_path::DerivationPath,
     hash,
     instruction::AccountMeta,
     message::VersionedMessage,
@@ -46,7 +45,7 @@ impl UtilsFactory for Factory {
             &self,
             length: u32
         ) -> Result<MnemonicWords, KeyError> {
-        
+
         // Ensure the mnemonic length is valid, for deriving we support only 12 and 24 words,
         // therefore for creating also gonna support only that
         let mnemonic_type = match length {
@@ -70,7 +69,7 @@ impl UtilsFactory for Factory {
             .split_whitespace()
             .map(String::from)
             .collect();
-    
+
         Ok(MnemonicWords { words })
     }
 }
@@ -94,13 +93,13 @@ impl PrivateKeyFactory for Factory {
 
         let seed = Seed::new(&mnemonic_phrase, passphrase.unwrap_or(""));
 
-        for i in derivation.iter() {
-            let derivation_path =
-                DerivationPath::from_absolute_path_str(format!("m/44'/501'/{}'/0'", i).as_str())
+        for (index, path_string) in derivation.paths().iter().enumerate() {
+            let path =
+                solana_sdk::derivation_path::DerivationPath::from_absolute_path_str(path_string)
                     .map_err(KeyError::derivation)?;
 
             let keypair =
-                keypair_from_seed_and_derivation_path(seed.as_bytes(), Some(derivation_path))
+                keypair_from_seed_and_derivation_path(seed.as_bytes(), Some(path))
                     .map_err(|e| KeyError::Generic(format!("Invalid Keypair: {e:?}")))?;
             let key = DerivedPrivateKey {
                 contents: keypair.to_base58_string(),
@@ -108,7 +107,7 @@ impl PrivateKeyFactory for Factory {
                     contents: keypair.pubkey().to_string(),
                     chain: Blockchain::Solana,
                 },
-                index: i,
+                index: index as u32,
             };
 
             keys.push(key)
@@ -249,7 +248,7 @@ impl TransactionFactory for Factory {
                 .recent_blockhash
                 .parse::<hash::Hash>()
                 .map_err(TransactionError::parsing_failure)?;
-    
+
             versioned_transaction.message.set_recent_blockhash(recent_blockhash);
         }
 
@@ -348,7 +347,7 @@ impl TransactionFactory for Factory {
                             .recent_blockhash
                             .parse::<hash::Hash>()
                             .map_err(TransactionError::parsing_failure)?;
-                
+
                         versioned_transaction.message.set_recent_blockhash(recent_blockhash);
                     }
 
@@ -421,10 +420,10 @@ impl TransactionFactory for Factory {
                             .recent_blockhash
                             .parse::<hash::Hash>()
                             .map_err(TransactionError::parsing_failure)?;
-                
+
                         versioned_transaction.message.set_recent_blockhash(recent_blockhash);
-                    }    
-                
+                    }
+
                     let serialized_tx = bincode::serialize(&versioned_transaction)
                         .map_err(TransactionError::parsing_failure)?;
                     Ok(to_base64(serialized_tx))
@@ -1048,9 +1047,9 @@ mod tests {
     #[test]
     fn test_generate_mnemonic_12_words() {
         let result = Factory.generate_mnemonic(12);
-        
+
         assert!(result.is_ok(), "Expected mnemonic generation to succeed");
-        
+
         let mnemonic = result.unwrap();
         assert_eq!(mnemonic.words.len(), 12, "Expected 12 words in mnemonic");
     }
@@ -1058,9 +1057,9 @@ mod tests {
     #[test]
     fn test_generate_mnemonic_24_words() {
         let result = Factory.generate_mnemonic(24);
-        
+
         assert!(result.is_ok(), "Expected mnemonic generation to succeed");
-        
+
         let mnemonic = result.unwrap();
         assert_eq!(mnemonic.words.len(), 24, "Expected 24 words in mnemonic");
     }
@@ -1068,9 +1067,9 @@ mod tests {
     #[test]
     fn test_generate_mnemonic_invalid_length() {
         let result = Factory.generate_mnemonic(18);
-        
+
         assert!(result.is_err(), "Expected error for invalid mnemonic length");
-        
+
         if let Err(KeyError::InvalidMnemonic(msg)) = result {
             assert_eq!(msg, "Only 12 or 24 word mnemonics are supported");
         } else {
@@ -1089,6 +1088,35 @@ mod tests {
         }
 
         assert_eq!(mnemonics.len(), 10, "Expected 10 unique mnemonics");
+    }
+
+    #[test]
+    fn test_bip44_root_derivation() {
+        let mnemonic = MnemonicWords::from_str(
+            "miracle pizza supply useful steak border same again youth silver access hundred",
+        )
+        .unwrap();
+
+        let derivation = Derivation {
+            start: 0,
+            count: 1,
+            path: DerivationPath::Bip44Root
+        };
+
+        let sender = Factory.derive(mnemonic, None, derivation).unwrap();
+
+        let key = ChainPrivateKey {
+            contents: sender[0].contents.to_owned(),
+            public_key: ChainPublicKey {
+                contents: sender[0].public_key.contents.to_owned(),
+                chain: Blockchain::Solana,
+            },
+        };
+
+        assert_eq!(
+            key.public_key.contents,
+            "9nNwJNeJnQmduBZZzYP717LRF8ExHT4GAa5Y6TktWgQq"
+        );
     }
 
     #[test]
@@ -1114,8 +1142,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 1,
-            account: 0,
-            network: ChainNetwork::Mainnet,
+            path: DerivationPath::Bip44Change
         };
 
         let sender = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1143,8 +1170,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 2,
-            account: 0,
-            network: ChainNetwork::Mainnet,
+            path: DerivationPath::Bip44Change
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1163,8 +1189,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 5,
-            account: 0,
-            network: ChainNetwork::Mainnet,
+            path: DerivationPath::Bip44Change
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1196,8 +1221,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 2,
-            account: 0,
-            network: ChainNetwork::Mainnet,
+            path: DerivationPath::Bip44Change
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1222,8 +1246,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 2,
-            account: 0,
-            network: ChainNetwork::Mainnet,
+            path: DerivationPath::Bip44Change
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
