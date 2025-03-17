@@ -5,6 +5,73 @@ set -e
 
 echo "------> Looking for JDK 21+ installation..."
 
+# Function to download and install Temurin JDK 21+
+download_and_install_jdk() {
+    echo "------> No JDK 21+ found. Attempting to download and install..."
+    
+    # Create a temporary directory
+    TMP_DIR=$(mktemp -d)
+    echo "------> Using temporary directory: $TMP_DIR"
+    
+    # Detect the OS
+    if [ "$(uname)" = "Darwin" ]; then
+        echo "------> macOS detected"
+        DOWNLOAD_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.2_13.tar.gz"
+        if [ "$(uname -m)" = "x86_64" ]; then
+            DOWNLOAD_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jdk_x64_mac_hotspot_21.0.2_13.tar.gz"
+        fi
+        
+        echo "------> Downloading JDK 21+ from $DOWNLOAD_URL"
+        curl -L "$DOWNLOAD_URL" -o "$TMP_DIR/jdk.tar.gz"
+        
+        mkdir -p "$TMP_DIR/jdk_extract"
+        tar -xzf "$TMP_DIR/jdk.tar.gz" -C "$TMP_DIR/jdk_extract"
+        
+        # Find the actual JDK home directory
+        if [ -d "$TMP_DIR/jdk_extract/jdk-21"*/Contents/Home ]; then
+            JDK_HOME=$(find "$TMP_DIR/jdk_extract" -type d -name "jdk-21*" -exec echo {}/Contents/Home \; | head -1)
+        elif [ -d "$TMP_DIR/jdk_extract/Contents/Home" ]; then
+            JDK_HOME="$TMP_DIR/jdk_extract/Contents/Home"
+        else
+            echo "❌ ERROR: Could not find JDK home directory in the extracted archive"
+            echo "Please install JDK 21+ manually from https://adoptium.net/temurin/releases/?version=21"
+            rm -rf "$TMP_DIR"
+            exit 1
+        fi
+        
+        echo "------> JDK extracted to $JDK_HOME"
+        
+        # Verify the downloaded JDK version
+        if [ -x "$JDK_HOME/bin/java" ]; then
+            downloaded_version=$("$JDK_HOME/bin/java" -version 2>&1 | grep -Eo 'version "([0-9]+)' | cut -d'"' -f2)
+            echo "------> Downloaded JDK version: $downloaded_version"
+            if [ -n "$downloaded_version" ] && [ "$downloaded_version" -ge 21 ]; then
+                echo "------> Successfully downloaded JDK 21+"
+            else
+                echo "❌ ERROR: Downloaded JDK version is not 21+. Got version: $downloaded_version"
+                echo "Please install JDK 21+ manually from https://adoptium.net/temurin/releases/?version=21"
+                rm -rf "$TMP_DIR"
+                exit 1
+            fi
+        else
+            echo "❌ ERROR: Could not find java executable in downloaded JDK"
+            echo "Please install JDK 21+ manually from https://adoptium.net/temurin/releases/?version=21"
+            rm -rf "$TMP_DIR"
+            exit 1
+        fi
+    else
+        echo "------> Unsupported OS for automatic JDK installation"
+        echo "Please install JDK 21+ manually from https://adoptium.net/temurin/releases/?version=21"
+        rm -rf "$TMP_DIR"
+        exit 1
+    fi
+    
+    export JAVA_HOME="$JDK_HOME"
+    export PATH="$JAVA_HOME/bin:$PATH"
+    echo "------> Temporary JDK 21+ installed at $JAVA_HOME"
+    "$JAVA_HOME/bin/java" -version
+}
+
 # Try to find JDK 21+ using java_home utility on macOS
 if [ "$(uname)" = "Darwin" ] && command -v /usr/libexec/java_home >/dev/null 2>&1; then
     if JAVA_21_HOME=$(/usr/libexec/java_home -v 21 2>/dev/null || /usr/libexec/java_home -v 21+ 2>/dev/null || /usr/libexec/java_home -v 23 2>/dev/null); then
@@ -49,15 +116,14 @@ fi
 current_version=$(get_java_numeric_version || echo "unknown")
 if [ "$current_version" = "unknown" ]; then
     echo "❌ ERROR: Could not determine Java version."
-    exit 1
+    download_and_install_jdk
 elif [ "$current_version" -ge 21 ]; then
     java_version=$(java -version 2>&1 | head -1)
     echo "------> Using Java: $java_version"
     echo "------> JAVA_HOME: $JAVA_HOME"
 else
-    echo "❌ ERROR: Found Java version $current_version, but version 21 or newer is required."
-    echo "Please install JDK 21+ manually from https://adoptium.net/temurin/releases/?version=21"
-    exit 1
+    echo "------> Found Java version $current_version, but version 21 or newer is required."
+    download_and_install_jdk
 fi
 
 # Check for C compiler and install if needed
@@ -135,4 +201,4 @@ fi
 
 # Now run the make command with the C compiler explicitly set
 echo "------> Running make with arguments: $@"
-CC=${CC:-/usr/bin/cc} make "$@" 
+CC=${CC:-/usr/bin/cc} JAVA_HOME="$JAVA_HOME" make "$@" 

@@ -7,7 +7,9 @@
 #   make apple    - Build Apple frameworks (iOS)
 #   make android  - Build Android libraries and AAR
 #   make clean    - Clean all build artifacts
+#   make uninstall - Remove all development dependencies (JDK, NDK, etc.)
 #   make release  - Create and upload a release (VERSION=x.y.z required)
+#   make help     - Show this help message
 #
 ################################################################################
 
@@ -147,6 +149,12 @@ clean:
 	rm -rf platforms/android/chainkit/src/main/jniLibs
 	@echo "------> Clean completed successfully!"
 
+# Uninstall all development dependencies
+.PHONY: uninstall
+uninstall:
+	@echo "------> Running uninstall script..."
+	@./scripts/uninstall.sh
+
 # Release a version
 .PHONY: release
 release: dependencies
@@ -166,6 +174,28 @@ release: dependencies
 	echo "------> Preparing and uploading Android AAR..." && \
 	./scripts/prepare_aar_for_distribution.sh $(VERSION)'
 	@echo "------> Release v$(VERSION) completed!"
+
+# Add a help target to explain available targets
+.PHONY: help
+help:
+	@echo "ChainKit Makefile Help"
+	@echo ""
+	@echo "Primary targets:"
+	@echo "  make all        - Build both Apple and Android"
+	@echo "  make apple      - Build Apple frameworks (iOS)"
+	@echo "  make android    - Build Android libraries and AAR"
+	@echo "  make clean      - Clean all build artifacts"
+	@echo "  make uninstall  - Remove all development dependencies (JDK, NDK, etc.)"
+	@echo "  make release    - Create and upload a release (VERSION=x.y.z required)"
+	@echo "  make help       - Show this help message"
+	@echo ""
+	@echo "Environment variables:"
+	@echo "  CONFIGURATION     - Build configuration (default: --release)"
+	@echo "  ENABLE_X86        - Enable x86_64 target for iOS (default: false)"
+	@echo "  ENABLE_SIMULATOR  - Enable simulator target for iOS (default: true)"
+	@echo "  ANDROID_HOME      - Android SDK location (default: ~/Library/Android/sdk)"
+	@echo "  JAVA_HOME         - JDK location (must be JDK 21+)"
+	@echo ""
 
 ################################################################################
 # UTILITY FUNCTIONS
@@ -317,21 +347,49 @@ define check_android_cmdline_tools
 			echo "   On Ubuntu: apt-get install unzip"; \
 			exit 1; \
 		fi; \
-		CMDLINE_TOOLS_ZIP="commandlinetools-mac-$(ANDROID_CMDLINE_TOOLS_VERSION).zip"; \
+		CMDLINE_TOOLS_ZIP="commandlinetools-mac-11076708_latest.zip"; \
 		DOWNLOAD_URL="https://dl.google.com/android/repository/$$CMDLINE_TOOLS_ZIP"; \
 		echo "------> Downloading from: $$DOWNLOAD_URL"; \
 		TMP_DIR=$$(mktemp -d); \
 		echo "------> Downloading to temporary directory: $$TMP_DIR"; \
 		curl -L $$DOWNLOAD_URL -o $$TMP_DIR/$$CMDLINE_TOOLS_ZIP; \
+		if [ ! -f $$TMP_DIR/$$CMDLINE_TOOLS_ZIP ]; then \
+			echo "❌ ERROR: Download failed - file not found"; \
+			exit 1; \
+		fi; \
+		echo "------> Verifying downloaded file..."; \
+		file_size=$$(stat -f%z $$TMP_DIR/$$CMDLINE_TOOLS_ZIP 2>/dev/null || stat -c%s $$TMP_DIR/$$CMDLINE_TOOLS_ZIP 2>/dev/null); \
+		if [ $$file_size -lt 1000000 ]; then \
+			echo "❌ ERROR: Downloaded file is too small ($$file_size bytes), likely corrupted or not a proper ZIP file"; \
+			echo "------> Trying alternative download URL..."; \
+			rm -f $$TMP_DIR/$$CMDLINE_TOOLS_ZIP; \
+			CMDLINE_TOOLS_ZIP="commandlinetools-mac-11076708_latest.zip"; \
+			DOWNLOAD_URL="https://dl.google.com/android/repository/$$CMDLINE_TOOLS_ZIP"; \
+			echo "------> Downloading from alternative URL: $$DOWNLOAD_URL"; \
+			curl -L $$DOWNLOAD_URL -o $$TMP_DIR/$$CMDLINE_TOOLS_ZIP; \
+		fi; \
 		echo "------> Extracting ZIP file..."; \
 		unzip -q $$TMP_DIR/$$CMDLINE_TOOLS_ZIP -d $$TMP_DIR || { \
 			echo "❌ ERROR: Failed to extract Android command line tools"; \
 			echo "ZIP file contents:"; \
 			ls -la $$TMP_DIR; \
 			echo "Trying alternative extraction method..."; \
-			/usr/bin/unzip -q $$TMP_DIR/$$CMDLINE_TOOLS_ZIP -d $$TMP_DIR || { \
+			/usr/bin/unzip $$TMP_DIR/$$CMDLINE_TOOLS_ZIP -d $$TMP_DIR || { \
 				echo "❌ ERROR: Both extraction methods failed"; \
-				exit 1; \
+				echo "------> Analyzing file content..."; \
+				file $$TMP_DIR/$$CMDLINE_TOOLS_ZIP; \
+				echo "------> Trying alternative download approach..."; \
+				rm -f $$TMP_DIR/$$CMDLINE_TOOLS_ZIP; \
+				echo "------> Downloading latest cmdline tools directly..."; \
+				curl -L "https://dl.google.com/android/repository/commandlinetools-mac-11076708_latest.zip" -o $$TMP_DIR/cmdline-tools-latest.zip; \
+				echo "------> Extracting with verbose output..."; \
+				unzip -v $$TMP_DIR/cmdline-tools-latest.zip -d $$TMP_DIR || { \
+					echo "❌ ERROR: All extraction attempts failed."; \
+					echo "Please download the Android command line tools manually from:"; \
+					echo "https://developer.android.com/studio#command-tools"; \
+					echo "Extract them to $(ANDROID_HOME)/cmdline-tools/latest/"; \
+					exit 1; \
+				}; \
 			}; \
 		}; \
 		echo "------> Checking extracted contents..."; \
@@ -348,6 +406,14 @@ define check_android_cmdline_tools
 			echo "------> Found nested cmdline-tools directory, installing..."; \
 			mkdir -p "$(ANDROID_HOME)/cmdline-tools"; \
 			mv $$TMP_DIR/cmdline-tools/cmdline-tools "$(ANDROID_HOME)/cmdline-tools/latest"; \
+		elif [ -d "$$TMP_DIR/cmdline-tools/tools" ] || [ -d "$$TMP_DIR/tools" ]; then \
+			echo "------> Found tools directory, installing..."; \
+			mkdir -p "$(ANDROID_HOME)/cmdline-tools/latest"; \
+			if [ -d "$$TMP_DIR/cmdline-tools/tools" ]; then \
+				cp -r $$TMP_DIR/cmdline-tools/tools/* "$(ANDROID_HOME)/cmdline-tools/latest/"; \
+			else \
+				cp -r $$TMP_DIR/tools/* "$(ANDROID_HOME)/cmdline-tools/latest/"; \
+			fi; \
 		else \
 			echo "------> Non-standard cmdline-tools structure, trying alternative approach..."; \
 			mkdir -p "$(ANDROID_HOME)/cmdline-tools/latest"; \
@@ -425,9 +491,12 @@ define check_jdk
 	@java_version=$$(java -version 2>&1 | head -1 | grep -Eo 'version "([0-9]+)' | cut -d'"' -f2 || echo "0")
 	@if [ -n "$$java_version" ] && [ $$(echo "$$java_version" | grep -E '^[0-9]+$$') ] && [ $$java_version -lt 21 ]; then \
 		echo "------> Current Java version $$java_version is insufficient, JDK 21+ required"; \
-		echo "------> Please use the wrapper script instead:"; \
-		echo "./run-with-java21.sh dependencies"; \
-		echo "------> The script will automatically find and use JDK 21+ on your system"; \
+		echo "------> No JDK 21+ found on the system. Please install JDK 21+ using one of these methods:"; \
+		echo "1. Download from Adoptium: https://adoptium.net/temurin/releases/?version=21"; \
+		echo "2. Using Homebrew: brew install --cask temurin"; \
+		echo "3. Using SDKMAN: sdk install java 21-tem"; \
+		echo "------> After installing, you can run:"; \
+		echo "JAVA_HOME=/path/to/jdk21 make android"; \
 		exit 1; \
 	else \
 		echo "------> Java version detected: $$java_version"; \
