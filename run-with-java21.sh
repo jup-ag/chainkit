@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script to find JDK 21+ and run make with it
+# Script to find JDK 21+ and set up Rust environment before running make
 
 set -e
 
@@ -54,10 +54,31 @@ elif [ "$current_version" -ge 21 ]; then
     java_version=$(java -version 2>&1 | head -1)
     echo "------> Using Java: $java_version"
     echo "------> JAVA_HOME: $JAVA_HOME"
-    echo "------> Running make with arguments: $@"
-    make "$@"
 else
     echo "❌ ERROR: Found Java version $current_version, but version 21 or newer is required."
     echo "Please install JDK 21+ manually from https://adoptium.net/temurin/releases/?version=21"
     exit 1
-fi 
+fi
+
+# Ensure Rust environment is set up properly
+echo "------> Setting up Rust environment..."
+if [ -f ./scripts/ensure_rust_env.sh ]; then
+    source ./scripts/ensure_rust_env.sh
+    echo "------> Rust environment set up successfully"
+else
+    echo "------> Warning: ./scripts/ensure_rust_env.sh not found. Using system Rust if available."
+    if [ -d "$HOME/.cargo/bin" ]; then
+        export PATH="$HOME/.cargo/bin:$PATH"
+        echo "------> Added $HOME/.cargo/bin to PATH"
+    fi
+fi
+
+# Ensure C compiler is properly set
+if [ -x /usr/bin/cc ]; then
+    export CC=/usr/bin/cc
+    echo "------> Using C compiler at: $CC"
+fi
+
+# Now run the make command
+echo "------> Running make with arguments: $@"
+make "$@" 
