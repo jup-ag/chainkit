@@ -483,9 +483,9 @@ endef
 # Simplified JDK check - uses wrapper script as recommended approach
 define check_jdk
 	@echo "------> Checking for JDK 21..."
-	@if [ ! -x ./run-with-java21.sh ]; then \
-		echo "❌ ERROR: run-with-java21.sh script not found or not executable"; \
-		echo "Please ensure the script exists and is executable (chmod +x run-with-java21.sh)"; \
+	@if [ ! -x ./scripts/build-with-jdk21.sh ]; then \
+		echo "❌ ERROR: scripts/build-with-jdk21.sh script not found or not executable"; \
+		echo "Please ensure the script exists and is executable (chmod +x scripts/build-with-jdk21.sh)"; \
 		exit 1; \
 	fi
 	@java_version=$$(java -version 2>&1 | head -1 | grep -Eo 'version "([0-9]+)' | cut -d'"' -f2 || echo "0")
