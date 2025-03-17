@@ -975,8 +975,7 @@ public object FfiConverterTypeDecimalNumber: FfiConverterRustBuffer<DecimalNumbe
 data class Derivation (
     val `start`: UInt, 
     val `count`: UInt, 
-    val `account`: UInt, 
-    val `network`: ChainNetwork
+    val `path`: DerivationPath
 ) {
     
     companion object
@@ -987,23 +986,20 @@ public object FfiConverterTypeDerivation: FfiConverterRustBuffer<Derivation> {
         return Derivation(
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
-            FfiConverterUInt.read(buf),
-            FfiConverterTypeChainNetwork.read(buf),
+            FfiConverterTypeDerivationPath.read(buf),
         )
     }
 
     override fun allocationSize(value: Derivation) = (
             FfiConverterUInt.allocationSize(value.`start`) +
             FfiConverterUInt.allocationSize(value.`count`) +
-            FfiConverterUInt.allocationSize(value.`account`) +
-            FfiConverterTypeChainNetwork.allocationSize(value.`network`)
+            FfiConverterTypeDerivationPath.allocationSize(value.`path`)
     )
 
     override fun write(value: Derivation, buf: ByteBuffer) {
             FfiConverterUInt.write(value.`start`, buf)
             FfiConverterUInt.write(value.`count`, buf)
-            FfiConverterUInt.write(value.`account`, buf)
-            FfiConverterTypeChainNetwork.write(value.`network`, buf)
+            FfiConverterTypeDerivationPath.write(value.`path`, buf)
     }
 }
 
@@ -1149,23 +1145,25 @@ public object FfiConverterTypeBlockchain: FfiConverterRustBuffer<Blockchain> {
 
 
 
-enum class ChainNetwork {
+enum class DerivationPath {
     
-    MAINNET,
-    TESTNET;
+    BIP44_ROOT,
+    BIP44,
+    BIP44_CHANGE,
+    DEPRECATED;
     companion object
 }
 
-public object FfiConverterTypeChainNetwork: FfiConverterRustBuffer<ChainNetwork> {
+public object FfiConverterTypeDerivationPath: FfiConverterRustBuffer<DerivationPath> {
     override fun read(buf: ByteBuffer) = try {
-        ChainNetwork.values()[buf.getInt() - 1]
+        DerivationPath.values()[buf.getInt() - 1]
     } catch (e: IndexOutOfBoundsException) {
         throw RuntimeException("invalid enum value, something is very wrong!!", e)
     }
 
-    override fun allocationSize(value: ChainNetwork) = 4
+    override fun allocationSize(value: DerivationPath) = 4
 
-    override fun write(value: ChainNetwork, buf: ByteBuffer) {
+    override fun write(value: DerivationPath, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }
