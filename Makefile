@@ -399,6 +399,7 @@ endef
 # Build Android libraries
 define build_android_libs
 	set -x && \
+	CC=/usr/bin/cc \
 	CARGO_PROFILE_RELEASE_STRIP=$(if $(findstring release,$(FOLDER)),true,false) \
 	ANDROID_NDK_HOME=$(ANDROID_NDK_HOME) \
 	cargo \
@@ -440,6 +441,7 @@ define check_cargo_ndk
 	@bash -c '$(RUST_ENV) && \
 	if ! cargo ndk --version >/dev/null 2>&1; then \
 		echo "------> Installing cargo-ndk..."; \
+		export CC=/usr/bin/cc && \
 		cargo install cargo-ndk && \
 		echo "------> cargo-ndk installed successfully"; \
 	else \
@@ -469,6 +471,7 @@ endef
 define check_rust_toolchain
 	@echo "------> Checking for Rust toolchain..."
 	@bash -c '$(RUST_ENV) && \
+	export CC=/usr/bin/cc && \
 	if ! command -v rustc >/dev/null; then \
 		echo "------> Installing Rust toolchain..."; \
 		curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; \
@@ -488,4 +491,4 @@ define check_rust_toolchain
 	for target in $(ANDROID_ARCHS); do \
 		rustup target add $$target; \
 	done'
-endef
+endef	

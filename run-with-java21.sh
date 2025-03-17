@@ -60,6 +60,66 @@ else
     exit 1
 fi
 
+# Check for C compiler and install if needed
+echo "------> Checking for C compiler..."
+CC_FOUND=false
+
+# Check common compiler locations
+if [ -x /usr/bin/cc ]; then
+    echo "------> Found C compiler at /usr/bin/cc"
+    export CC=/usr/bin/cc
+    CC_FOUND=true
+elif [ -x /usr/bin/gcc ]; then
+    echo "------> Found C compiler at /usr/bin/gcc"
+    export CC=/usr/bin/gcc
+    CC_FOUND=true
+elif [ -x /usr/bin/clang ]; then
+    echo "------> Found C compiler at /usr/bin/clang"
+    export CC=/usr/bin/clang
+    CC_FOUND=true
+fi
+
+# If no compiler found, try to install one
+if [ "$CC_FOUND" = "false" ]; then
+    echo "------> No C compiler found, attempting to install..."
+    
+    # Detect OS
+    if [ "$(uname)" = "Darwin" ]; then
+        echo "------> macOS detected, installing Command Line Tools..."
+        xcode-select --install || true
+        if [ -x /usr/bin/cc ]; then
+            echo "------> C compiler installed at /usr/bin/cc"
+            export CC=/usr/bin/cc
+            CC_FOUND=true
+        fi
+    elif [ -f /etc/debian_version ]; then
+        echo "------> Debian/Ubuntu detected, installing build-essential..."
+        sudo apt-get update && sudo apt-get install -y build-essential
+        if [ -x /usr/bin/cc ]; then
+            echo "------> C compiler installed at /usr/bin/cc"
+            export CC=/usr/bin/cc
+            CC_FOUND=true
+        fi
+    elif [ -f /etc/redhat-release ]; then
+        echo "------> RHEL/CentOS detected, installing Development Tools..."
+        sudo yum -y update && sudo yum -y groupinstall "Development Tools"
+        if [ -x /usr/bin/cc ]; then
+            echo "------> C compiler installed at /usr/bin/cc"
+            export CC=/usr/bin/cc
+            CC_FOUND=true
+        fi
+    else
+        echo "------> Unknown OS, cannot install C compiler automatically."
+    fi
+fi
+
+# Final check if we have a C compiler
+if [ "$CC_FOUND" = "false" ]; then
+    echo "❌ ERROR: Could not find or install a C compiler."
+    echo "Please install a C compiler manually (gcc or clang)."
+    exit 1
+fi
+
 # Ensure Rust environment is set up properly
 echo "------> Setting up Rust environment..."
 if [ -f ./scripts/ensure_rust_env.sh ]; then
@@ -73,12 +133,6 @@ else
     fi
 fi
 
-# Ensure C compiler is properly set
-if [ -x /usr/bin/cc ]; then
-    export CC=/usr/bin/cc
-    echo "------> Using C compiler at: $CC"
-fi
-
-# Now run the make command
+# Now run the make command with the C compiler explicitly set
 echo "------> Running make with arguments: $@"
-make "$@" 
+CC=${CC:-/usr/bin/cc} make "$@" 
