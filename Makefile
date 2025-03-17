@@ -167,6 +167,15 @@ release: dependencies
 	@echo "------> Android architectures: $(ANDROID_ARCHS)"
 	@echo "------> NOTE: All architectures must build successfully for the release to complete."
 	@bash -c '$(RUST_ENV) && \
+	if [ -z "$$GITHUB_TOKEN" ]; then \
+		echo "GITHUB_TOKEN environment variable is not set."; \
+		echo "Please enter your GitHub Personal Access Token with write:packages permission:"; \
+		read -s token; \
+		export GITHUB_TOKEN=$$token; \
+		echo "GITHUB_TOKEN has been set for this session."; \
+	else \
+		echo "Using existing GITHUB_TOKEN from environment."; \
+	fi && \
 	echo "------> Creating GitHub release..." && \
 	./scripts/create_github_release.sh $(VERSION) && \
 	echo "------> Preparing and uploading XCFramework..." && \
