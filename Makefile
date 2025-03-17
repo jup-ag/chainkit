@@ -28,11 +28,11 @@ ENABLE_X86 ?= false
 ENABLE_SIMULATOR ?= true
 
 # Android configuration  
-ANDROID_HOME ?= $(HOME)/Library/Android/sdk
+ANDROID_HOME ?= $(shell echo $$ANDROID_HOME || echo $(HOME)/Library/Android/sdk)
 ANDROID_NDK_VERSION ?= 28.0.12433566
 ANDROID_PLATFORM ?= 28
 ANDROID_NDK_HOME ?= $(ANDROID_HOME)/ndk/$(ANDROID_NDK_VERSION)
-ANDROID_CMDLINE_TOOLS_VERSION ?= 11076708
+ANDROID_CMDLINE_TOOLS_VERSION ?= 11.0
 ANDROID_CMDLINE_TOOLS_PATH ?= $(ANDROID_HOME)/cmdline-tools/latest
 ANDROID_ARCHS ?= aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
 
@@ -45,15 +45,27 @@ $(shell mkdir -p platforms/ios)
 
 # Default target to build both Apple and Android
 .PHONY: all
-all: apple android
+all: dependencies apple android
+
+# Check for required dependencies
+.PHONY: dependencies
+dependencies:
+	@echo "------> Checking for required dependencies..."
+	$(call check_homebrew)
+	$(call check_jdk)
+	$(call check_rust_toolchain)
+	$(call check_cargo_ndk)
+	$(call check_android_sdk)
+	$(call check_android_cmdline_tools)
+	$(call check_android_ndk)
+	@echo "------> All dependencies are installed!"
 
 # Build Apple frameworks
 .PHONY: apple
-apple:
+apple: dependencies
 	@echo "------> Starting Apple build..."
 	@echo "------> Configuration: $(CONFIGURATION), Folder: $(FOLDER)"
 	@echo "------> ENABLE_X86: $(ENABLE_X86), ENABLE_SIMULATOR: $(ENABLE_SIMULATOR)"
-	@echo "------> Checking for Rust toolchain..."
 	@bash -c '$(RUST_ENV) && \
 		echo "------> Building framework targets..." && \
 		$(call build_apple_targets) && \
@@ -77,21 +89,11 @@ apple:
 
 # Build Android libraries and AAR
 .PHONY: android
-android:
+android: dependencies
 	@echo "------> Starting Android build..."
 	@echo "------> Configuration: $(CONFIGURATION), Folder: $(FOLDER)"
 	@echo "------> NDK Version: $(ANDROID_NDK_VERSION), Platform: $(ANDROID_PLATFORM)"
 	@echo "------> Building for architectures: $(ANDROID_ARCHS)"
-	
-	# Check Android SDK and install components
-	$(call check_android_sdk)
-	$(call check_android_cmdline_tools)
-	$(call check_android_ndk)
-	
-	@echo "------> Checking for Rust toolchain..."
-	bash -c '$(RUST_ENV) && \
-		echo "------> Adding Android targets..." && \
-		rustup target add $(ANDROID_ARCHS)'
 	
 	@echo "------> Running tests..."
 	bash -c '$(RUST_ENV) && cargo test'
@@ -147,7 +149,7 @@ clean:
 
 # Release a version
 .PHONY: release
-release:
+release: dependencies
 	@echo "------> Creating and uploading release with version $(VERSION)"
 	@if [ -z "$(VERSION)" ]; then \
 		echo "ERROR: VERSION not specified"; \
@@ -156,7 +158,6 @@ release:
 	fi
 	@echo "------> Android architectures: $(ANDROID_ARCHS)"
 	@echo "------> NOTE: All architectures must build successfully for the release to complete."
-	@echo "------> Checking for Rust toolchain..."
 	@bash -c '$(RUST_ENV) && \
 	echo "------> Creating GitHub release..." && \
 	./scripts/create_github_release.sh $(VERSION) && \
@@ -173,18 +174,6 @@ release:
 # Build targets for all Apple architectures
 define build_apple_targets
 	echo "------> Building for architectures..."; \
-	echo "------> Checking for installed Rust targets..."; \
-	rustup target list --installed; \
-	echo "------> Installing required targets..."; \
-	rustup target add aarch64-apple-ios; \
-	if $(ENABLE_SIMULATOR); then \
-		echo "------> Installing simulator target..."; \
-		rustup target add aarch64-apple-ios-sim; \
-	fi; \
-	if $(ENABLE_X86); then \
-		echo "------> Installing x86_64 target..."; \
-		rustup target add x86_64-apple-ios; \
-	fi; \
 	echo "------> Building for aarch64-apple-ios..."; \
 	cargo build $(CONFIGURATION) --target aarch64-apple-ios || { echo "❌ Failed to build aarch64-apple-ios target"; exit 1; }; \
 	if $(ENABLE_SIMULATOR); then \
@@ -322,16 +311,54 @@ define check_android_cmdline_tools
 	@if [ ! -d "$(ANDROID_CMDLINE_TOOLS_PATH)" ]; then \
 		echo "------> Android command line tools not found at $(ANDROID_CMDLINE_TOOLS_PATH)"; \
 		echo "------> Installing Android command line tools..."; \
-		CMDLINE_TOOLS_ZIP="commandlinetools-mac-$(ANDROID_CMDLINE_TOOLS_VERSION)_latest.zip"; \
+		if ! command -v unzip >/dev/null; then \
+			echo "❌ ERROR: 'unzip' command not found. Please install it using:"; \
+			echo "   On macOS: brew install unzip"; \
+			echo "   On Ubuntu: apt-get install unzip"; \
+			exit 1; \
+		fi; \
+		CMDLINE_TOOLS_ZIP="commandlinetools-mac-$(ANDROID_CMDLINE_TOOLS_VERSION).zip"; \
 		DOWNLOAD_URL="https://dl.google.com/android/repository/$$CMDLINE_TOOLS_ZIP"; \
+		echo "------> Downloading from: $$DOWNLOAD_URL"; \
 		TMP_DIR=$$(mktemp -d); \
+		echo "------> Downloading to temporary directory: $$TMP_DIR"; \
 		curl -L $$DOWNLOAD_URL -o $$TMP_DIR/$$CMDLINE_TOOLS_ZIP; \
-		mkdir -p "$(ANDROID_HOME)/cmdline-tools"; \
-		unzip -q $$TMP_DIR/$$CMDLINE_TOOLS_ZIP -d $$TMP_DIR; \
-		mv $$TMP_DIR/cmdline-tools "$(ANDROID_HOME)/cmdline-tools/latest"; \
+		echo "------> Extracting ZIP file..."; \
+		unzip -q $$TMP_DIR/$$CMDLINE_TOOLS_ZIP -d $$TMP_DIR || { \
+			echo "❌ ERROR: Failed to extract Android command line tools"; \
+			echo "ZIP file contents:"; \
+			ls -la $$TMP_DIR; \
+			echo "Trying alternative extraction method..."; \
+			/usr/bin/unzip -q $$TMP_DIR/$$CMDLINE_TOOLS_ZIP -d $$TMP_DIR || { \
+				echo "❌ ERROR: Both extraction methods failed"; \
+				exit 1; \
+			}; \
+		}; \
+		echo "------> Checking extracted contents..."; \
+		ls -la $$TMP_DIR; \
+		if [ -d "$$TMP_DIR/cmdline-tools" ]; then \
+			echo "------> Found cmdline-tools directory, installing..."; \
+			mkdir -p "$(ANDROID_HOME)/cmdline-tools"; \
+			mv $$TMP_DIR/cmdline-tools "$(ANDROID_HOME)/cmdline-tools/latest"; \
+		elif [ -d "$$TMP_DIR/cmdline-tools/bin" ]; then \
+			echo "------> Found cmdline-tools/bin directory, installing..."; \
+			mkdir -p "$(ANDROID_HOME)/cmdline-tools"; \
+			mv $$TMP_DIR/cmdline-tools "$(ANDROID_HOME)/cmdline-tools/latest"; \
+		elif [ -d "$$TMP_DIR/cmdline-tools/cmdline-tools" ]; then \
+			echo "------> Found nested cmdline-tools directory, installing..."; \
+			mkdir -p "$(ANDROID_HOME)/cmdline-tools"; \
+			mv $$TMP_DIR/cmdline-tools/cmdline-tools "$(ANDROID_HOME)/cmdline-tools/latest"; \
+		else \
+			echo "------> Non-standard cmdline-tools structure, trying alternative approach..."; \
+			mkdir -p "$(ANDROID_HOME)/cmdline-tools/latest"; \
+			find $$TMP_DIR -type f -exec cp {} "$(ANDROID_HOME)/cmdline-tools/latest/" \; 2>/dev/null || true; \
+			find $$TMP_DIR -type d -not -path "$$TMP_DIR" -exec cp -r {} "$(ANDROID_HOME)/cmdline-tools/latest/" \; 2>/dev/null || true; \
+		fi; \
 		rm -rf $$TMP_DIR; \
 		if [ ! -d "$(ANDROID_CMDLINE_TOOLS_PATH)" ]; then \
 			echo "ERROR: Failed to install Android command line tools"; \
+			echo "Please install Android command line tools manually and set ANDROID_CMDLINE_TOOLS_PATH in the Makefile."; \
+			echo "You can download the tools from: https://developer.android.com/studio#command-tools"; \
 			exit 1; \
 		fi; \
 		echo "------> Android command line tools installed successfully"; \
@@ -345,9 +372,22 @@ define check_android_ndk
 	@if [ ! -d "$(ANDROID_NDK_HOME)" ]; then \
 		echo "------> Android NDK $(ANDROID_NDK_VERSION) not found at $(ANDROID_NDK_HOME)"; \
 		echo "------> Installing Android NDK $(ANDROID_NDK_VERSION)..."; \
-		"$(ANDROID_CMDLINE_TOOLS_PATH)/bin/sdkmanager" --install "ndk;$(ANDROID_NDK_VERSION)"; \
+		if [ -x "$(ANDROID_CMDLINE_TOOLS_PATH)/bin/sdkmanager" ]; then \
+			"$(ANDROID_CMDLINE_TOOLS_PATH)/bin/sdkmanager" --install "ndk;$(ANDROID_NDK_VERSION)" || { \
+				echo "❌ ERROR: Failed to install Android NDK using sdkmanager"; \
+				echo "Please install Android NDK $(ANDROID_NDK_VERSION) manually and set ANDROID_NDK_HOME in the Makefile."; \
+				echo "You can download the NDK from: https://developer.android.com/ndk/downloads"; \
+				exit 1; \
+			}; \
+		else \
+			echo "❌ ERROR: sdkmanager not found at $(ANDROID_CMDLINE_TOOLS_PATH)/bin/sdkmanager"; \
+			echo "Please ensure Android command line tools are installed correctly."; \
+			exit 1; \
+		fi; \
 		if [ ! -d "$(ANDROID_NDK_HOME)" ]; then \
-			echo "ERROR: Failed to install Android NDK $(ANDROID_NDK_VERSION)"; \
+			echo "❌ ERROR: Failed to install Android NDK $(ANDROID_NDK_VERSION)"; \
+			echo "Please install Android NDK $(ANDROID_NDK_VERSION) manually and set ANDROID_NDK_HOME in the Makefile."; \
+			echo "You can download the NDK from: https://developer.android.com/ndk/downloads"; \
 			exit 1; \
 		fi; \
 		echo "------> Android NDK $(ANDROID_NDK_VERSION) installed successfully"; \
@@ -371,4 +411,98 @@ define build_android_libs
 		--platform $(ANDROID_PLATFORM) \
 		$(addprefix --target ,$(ANDROID_ARCHS)) \
 		build $(CONFIGURATION) || { echo "❌ ERROR: Cargo build failed with exit code $$?"; exit 1; }
+endef
+
+# Check if JDK 21 is installed
+define check_jdk
+	@echo "------> Checking for JDK 21..."
+	@if ! command -v java >/dev/null; then \
+		echo "------> Java not found"; \
+		if [ "$(shell uname)" = "Darwin" ] && command -v brew >/dev/null; then \
+			echo "------> Installing JDK 21 using Homebrew..."; \
+			brew install --cask temurin; \
+			echo "------> JDK 21 installed successfully"; \
+		else \
+			echo "❌ ERROR: Please install JDK 21 manually."; \
+			echo "You can download it from: https://adoptium.net/temurin/releases/?version=21"; \
+			exit 1; \
+		fi; \
+	else \
+		java_version_line=$$(java -version 2>&1 | head -1); \
+		echo "------> Found Java: $$java_version_line"; \
+		java_version=$$(echo "$$java_version_line" | grep -Eo "version \"[0-9]+(\.[0-9]+)*\"" | grep -Eo "[0-9]+(\.[0-9]+)*" | cut -d'.' -f1); \
+		if [ -z "$$java_version" ]; then \
+			java_version=$$(echo "$$java_version_line" | grep -Eo "[0-9]+(\.[0-9]+)*" | head -1 | cut -d'.' -f1); \
+		fi; \
+		if [ -z "$$java_version" ] || [ "$$java_version" -lt "21" ]; then \
+			echo "------> JDK 21 or higher required (detected: $$java_version)"; \
+			if [ "$(shell uname)" = "Darwin" ] && command -v brew >/dev/null; then \
+				echo "------> Installing JDK 21 using Homebrew..."; \
+				brew install --cask temurin; \
+				echo "------> JDK 21 installed successfully"; \
+			else \
+				echo "❌ ERROR: Please install JDK 21 manually."; \
+				echo "You can download it from: https://adoptium.net/temurin/releases/?version=21"; \
+				exit 1; \
+			fi; \
+		else \
+			echo "------> JDK version is sufficient ($$java_version)"; \
+		fi; \
+	fi
+endef
+
+# Check if cargo-ndk is installed
+define check_cargo_ndk
+	@echo "------> Checking for cargo-ndk..."
+	@bash -c '$(RUST_ENV) && \
+	if ! cargo ndk --version >/dev/null 2>&1; then \
+		echo "------> Installing cargo-ndk..."; \
+		cargo install cargo-ndk && \
+		echo "------> cargo-ndk installed successfully"; \
+	else \
+		echo "------> Found cargo-ndk $$(cargo ndk --version 2>&1 | head -1)"; \
+	fi'
+endef
+
+# Check if Homebrew is installed (macOS only)
+define check_homebrew
+	@if [ "$(shell uname)" = "Darwin" ]; then \
+		echo "------> Checking for Homebrew..."; \
+		if ! command -v brew >/dev/null; then \
+			echo "------> Installing Homebrew..."; \
+			/bin/bash -c "$$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || { \
+				echo "❌ ERROR: Failed to install Homebrew."; \
+				echo "Please install Homebrew manually from: https://brew.sh"; \
+				exit 1; \
+			}; \
+			echo "------> Homebrew installed successfully"; \
+		else \
+			echo "------> Found Homebrew $$(brew --version | head -1)"; \
+		fi; \
+	fi
+endef
+
+# Check if Rust toolchain is installed
+define check_rust_toolchain
+	@echo "------> Checking for Rust toolchain..."
+	@bash -c '$(RUST_ENV) && \
+	if ! command -v rustc >/dev/null; then \
+		echo "------> Installing Rust toolchain..."; \
+		curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; \
+		echo "------> Rust toolchain installed successfully"; \
+	else \
+		echo "------> Found Rust $$(rustc --version)"; \
+	fi; \
+	echo "------> Installing required Rust targets for iOS..."; \
+	rustup target add aarch64-apple-ios; \
+	if $(ENABLE_SIMULATOR); then \
+		rustup target add aarch64-apple-ios-sim; \
+	fi; \
+	if $(ENABLE_X86); then \
+		rustup target add x86_64-apple-ios; \
+	fi; \
+	echo "------> Installing required Android targets..."; \
+	for target in $(ANDROID_ARCHS); do \
+		rustup target add $$target; \
+	done'
 endef
