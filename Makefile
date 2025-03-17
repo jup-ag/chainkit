@@ -413,41 +413,24 @@ define build_android_libs
 		build $(CONFIGURATION) || { echo "❌ ERROR: Cargo build failed with exit code $$?"; exit 1; }
 endef
 
-# Check if JDK 21 is installed
+# Simplified JDK check - uses wrapper script as recommended approach
 define check_jdk
 	@echo "------> Checking for JDK 21..."
-	@if ! command -v java >/dev/null; then \
-		echo "------> Java not found"; \
-		if [ "$(shell uname)" = "Darwin" ] && command -v brew >/dev/null; then \
-			echo "------> Installing JDK 21 using Homebrew..."; \
-			brew install --cask temurin; \
-			echo "------> JDK 21 installed successfully"; \
-		else \
-			echo "❌ ERROR: Please install JDK 21 manually."; \
-			echo "You can download it from: https://adoptium.net/temurin/releases/?version=21"; \
-			exit 1; \
-		fi; \
+	@if [ ! -x ./run-with-java21.sh ]; then \
+		echo "❌ ERROR: run-with-java21.sh script not found or not executable"; \
+		echo "Please ensure the script exists and is executable (chmod +x run-with-java21.sh)"; \
+		exit 1; \
+	fi
+	@java_version=$$(java -version 2>&1 | head -1 | grep -Eo 'version "([0-9]+)' | cut -d'"' -f2 || echo "0")
+	@if [ -n "$$java_version" ] && [ $$(echo "$$java_version" | grep -E '^[0-9]+$$') ] && [ $$java_version -lt 21 ]; then \
+		echo "------> Current Java version $$java_version is insufficient, JDK 21+ required"; \
+		echo "------> Please use the wrapper script instead:"; \
+		echo "./run-with-java21.sh dependencies"; \
+		echo "------> The script will automatically find and use JDK 21+ on your system"; \
+		exit 1; \
 	else \
-		java_version_line=$$(java -version 2>&1 | head -1); \
-		echo "------> Found Java: $$java_version_line"; \
-		java_version=$$(echo "$$java_version_line" | grep -Eo "version \"[0-9]+(\.[0-9]+)*\"" | grep -Eo "[0-9]+(\.[0-9]+)*" | cut -d'.' -f1); \
-		if [ -z "$$java_version" ]; then \
-			java_version=$$(echo "$$java_version_line" | grep -Eo "[0-9]+(\.[0-9]+)*" | head -1 | cut -d'.' -f1); \
-		fi; \
-		if [ -z "$$java_version" ] || [ "$$java_version" -lt "21" ]; then \
-			echo "------> JDK 21 or higher required (detected: $$java_version)"; \
-			if [ "$(shell uname)" = "Darwin" ] && command -v brew >/dev/null; then \
-				echo "------> Installing JDK 21 using Homebrew..."; \
-				brew install --cask temurin; \
-				echo "------> JDK 21 installed successfully"; \
-			else \
-				echo "❌ ERROR: Please install JDK 21 manually."; \
-				echo "You can download it from: https://adoptium.net/temurin/releases/?version=21"; \
-				exit 1; \
-			fi; \
-		else \
-			echo "------> JDK version is sufficient ($$java_version)"; \
-		fi; \
+		echo "------> Java version detected: $$java_version"; \
+		echo "------> Continuing with build..."; \
 	fi
 endef
 
