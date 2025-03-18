@@ -37,6 +37,12 @@ This will:
 3. Package and upload the Android AAR to the release
 4. Publish the Android AAR to GitHub Packages
 
+For convenience, you can also use the "yolo" target which cleans, builds all platforms, and creates a release in one command:
+
+```bash
+make yolo VERSION=x.y.z
+```
+
 ## Release Scripts
 
 The release process is divided into three scripts:
@@ -51,7 +57,7 @@ You can run these scripts individually if needed, but normally they are called b
 
 To use the Android library from GitHub Packages in your project:
 
-1. Add the GitHub Packages repository to your `settings.gradle.kts`:
+1. Add the GitHub Packages repository to your `settings.gradle` or `settings.gradle.kts`:
 
 ```kotlin
 dependencyResolutionManagement {
@@ -69,15 +75,25 @@ dependencyResolutionManagement {
 }
 ```
 
-2. Add the dependency to your module's `build.gradle.kts`:
+2. Add the dependency to your module's `build.gradle` or `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("ag.jup.chainkit:chainkit:x.y.z")
+    implementation("ag.jup.chainkit:chainkit:x.y.z") // Replace x.y.z with the desired version
 }
 ```
 
-3. Make sure to provide GitHub credentials either through environment variables or Gradle properties.
+3. Configure GitHub credentials in one of the following ways:
+
+   - **Environment Variables**: Set `GITHUB_ACTOR` (your GitHub username) and `GITHUB_TOKEN` (your Personal Access Token with `read:packages` scope)
+   
+   - **Gradle Properties**: Add the following to your `~/.gradle/gradle.properties` file:
+     ```
+     gpr.user=YOUR_GITHUB_USERNAME
+     gpr.key=YOUR_GITHUB_TOKEN
+     ```
+
+   - **Project Properties**: Add the credentials to your project's `gradle.properties` file (not recommended for public repositories)
 
 ## Using the iOS Swift Package
 
