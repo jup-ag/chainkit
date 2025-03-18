@@ -68,6 +68,8 @@ pub enum TransactionError {
     ParsingFailure(String),
     #[error("Instruction Error: {0}")]
     InstructionError(String),
+    #[error("Sign message Error: {0}")]
+    SignMsgError(String),
     #[error("Generic Error: {0}")]
     Generic(String),
 }

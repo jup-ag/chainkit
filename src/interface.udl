@@ -9,6 +9,7 @@ enum TransactionError {
   "ParsingFailure",
   "InstructionError",
   "DecimalConversion",
+  "SignMsgError",
   "Generic",
 };
 
