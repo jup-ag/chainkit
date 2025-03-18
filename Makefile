@@ -158,24 +158,28 @@ uninstall:
 # Release a version
 .PHONY: release
 release: dependencies
-	@echo "------> Creating and uploading release with version $(VERSION)"
 	@if [ -z "$(VERSION)" ]; then \
 		echo "ERROR: VERSION not specified"; \
 		echo "Usage: make release VERSION=x.y.z"; \
 		exit 1; \
 	fi
+
+	@echo "------> Creating and uploading release with version $(VERSION)"
+
+	@echo "------> Checking for GITHUB_TOKEN..."
+	@if [ -z "$(GITHUB_TOKEN)" ]; then \
+		echo "GITHUB_TOKEN environment variable is not set."; \
+		echo "Please set it using: export GITHUB_TOKEN=your_token"; \
+		echo "Then run the command again."; \
+		exit 1; \
+	else \
+		echo "------> GITHUB_TOKEN found in environment"; \
+	fi
+
 	@echo "------> Android architectures: $(ANDROID_ARCHS)"
 	@echo "------> NOTE: All architectures must build successfully for the release to complete."
 	@bash -c '$(RUST_ENV) && \
-	if [ -z "$$GITHUB_TOKEN" ]; then \
-		echo "GITHUB_TOKEN environment variable is not set."; \
-		echo "Please enter your GitHub Personal Access Token with write:packages permission:"; \
-		read -s token; \
-		export GITHUB_TOKEN=$$token; \
-		echo "GITHUB_TOKEN has been set for this session."; \
-	else \
-		echo "Using existing GITHUB_TOKEN from environment."; \
-	fi && \
+	echo "------> Using GITHUB_TOKEN from environment for release..." && \
 	echo "------> Creating GitHub release..." && \
 	./scripts/create_github_release.sh $(VERSION) && \
 	echo "------> Preparing and uploading XCFramework..." && \
@@ -183,6 +187,35 @@ release: dependencies
 	echo "------> Preparing and uploading Android AAR..." && \
 	./scripts/prepare_aar_for_distribution.sh $(VERSION)'
 	@echo "------> Release v$(VERSION) completed!"
+
+# Run clean, all, and release in sequence
+.PHONY: yolo
+yolo:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "ERROR: VERSION not specified"; \
+		echo "Usage: make yolo VERSION=x.y.z"; \
+		exit 1; \
+	fi
+
+	@echo "------> Starting YOLO build: clean, build all, and release with version $(VERSION)"
+	
+	@echo "------> Checking for GITHUB_TOKEN..."
+	@if [ -z "$(GITHUB_TOKEN)" ]; then \
+		echo "GITHUB_TOKEN environment variable is not set."; \
+		echo "Please set it using: export GITHUB_TOKEN=your_token"; \
+		echo "Then run the yolo command again."; \
+		exit 1; \
+	else \
+		echo "------> GITHUB_TOKEN found in environment"; \
+	fi
+	
+	@echo "------> Running make clean..."
+	@$(MAKE) clean
+	@echo "------> Running make all..."
+	@$(MAKE) all
+	@echo "------> Running make release VERSION=$(VERSION) with GITHUB_TOKEN..."
+	@$(MAKE) release VERSION=$(VERSION) GITHUB_TOKEN=$(GITHUB_TOKEN)
+	@echo "------> YOLO build completed successfully!"
 
 # Add a help target to explain available targets
 .PHONY: help
@@ -196,6 +229,7 @@ help:
 	@echo "  make clean      - Clean all build artifacts"
 	@echo "  make uninstall  - Remove all development dependencies (JDK, NDK, etc.)"
 	@echo "  make release    - Create and upload a release (VERSION=x.y.z required)"
+	@echo "  make yolo       - Run clean, build all, and release in sequence (VERSION=x.y.z required)"
 	@echo "  make help       - Show this help message"
 	@echo ""
 	@echo "Environment variables:"

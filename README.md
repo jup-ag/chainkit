@@ -33,11 +33,6 @@ make android
 make clean
 ```
 
-**Profile build (with x86_64 support for Instruments):**
-```bash
-make profile
-```
-
 ### Build Outputs
 
 After successful builds, the framework files will be located at:
@@ -51,9 +46,14 @@ After successful builds, the framework files will be located at:
 
 ## Release
 
-**Make new release and upload binary frameworks:**
+**Create a new (or override an existing) release and upload (previously built) binary frameworks:**
 ```bash
 make release VERSION=1.0.0
+```
+
+**Clean, build all, and release in one command:**
+```bash
+make yolo VERSION=1.0.0
 ```
 
 Please see [RELEASE](https://github.com/jup-ag/chainkit/blob/main/RELEASE.md) for more details.
@@ -72,11 +72,32 @@ dependencies: [
 
 ### Android (Gradle)
 
-TODO: Add Gradle Instructions
+Add ChainKit as a dependency using GitHub Packages:
 
-## Advanced Configuration
+1. Add the GitHub Packages repository to your `settings.gradle` or `settings.gradle.kts`:
 
-For advanced build configurations, check the Makefile comments for options like:
-- Debug versus release builds
-- Enabling x86_64 architecture for Apple platforms
-- Simulator support settings
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        // ... other repositories ...
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/jup-ag/chainkit")
+            credentials {
+                username = project.findProperty("gpr.user") as String? ?: System.getenv("GITHUB_ACTOR")
+                password = project.findProperty("gpr.key") as String? ?: System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+}
+```
+
+2. Add the dependency to your module's `build.gradle` or `build.gradle.kts`:
+
+```kotlin
+dependencies {
+    implementation("ag.jup.chainkit:chainkit:1.0.0")
+}
+```
+
+3. Make sure to provide GitHub credentials either through environment variables or Gradle properties.
