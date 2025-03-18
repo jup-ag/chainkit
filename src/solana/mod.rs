@@ -634,10 +634,20 @@ impl TransactionFactory for Factory {
             0 => return Err(TransactionError::SignerMissing),
             _ => return Err(TransactionError::MultipleSigners),
         }
-
-        let signer_keypair = &signers[0].signer_keypair()?;
         let message_bytes = from_base64(&message).map_err(TransactionError::parsing_failure)?;
 
+        // Check if the message is a Solana transaction or transaction message
+        if bincode::deserialize::<Transaction>(&message_bytes).is_ok()
+            || bincode::deserialize::<VersionedTransaction>(&message_bytes).is_ok()
+            || bincode::deserialize::<Message>(&message_bytes).is_ok()
+            || bincode::deserialize::<VersionedMessage>(&message_bytes).is_ok()
+        {
+            return Err(TransactionError::SignMsgError(
+                "You cannot sign solana transactions using sign_message".to_string(),
+            ));
+        }
+
+        let signer_keypair = &signers[0].signer_keypair()?;
         let signature = signer_keypair
             .try_sign_message(&message_bytes)
             .map_err(TransactionError::instruction_error)?;
@@ -1796,6 +1806,33 @@ mod tests {
             versioned_tx.signatures[1].to_string(),
             Signature::default().to_string()
         )
+    }
+
+    #[test]
+    fn test_sign_tx_as_msg() {
+        let signer = generate_key_from_mnemonic(
+            "ski seven shuffle amazing tooth net useful asthma drive crystal solar glare",
+        );
+        assert_eq!(
+            signer.public_key.contents,
+            "F7xVyQuLzvyUKbMQyrBHaqYGCzHWpmsocn8b7oRUyeC5"
+        );
+        assert_eq!(signer.contents, "3NpEaVRpJAQjCxa6RM9zVrBpC7B61ypQJxt8FQM41jKZLi5bDdUnn3yXHyyLcDuFcoQrbECDH7SEiPi2z4j9w9PT");
+
+        let tx = "AQABAvgqkM3VuRGEx9d9Nxkc2mkQbyWkAIKgKm8Kc6kWriuNAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADw9HByfZnAzxsUu0r8ArmMmQchplDaq1uPaGgpIw/QSgEBAgAADAIAAABAQg8AAAAAAA==";
+
+        let signed_message = Factory.sign_message(tx.to_string(), vec![signer]);
+
+        assert!(signed_message.is_err());
+        match signed_message {
+            Err(TransactionError::SignMsgError(msg)) => {
+                assert_eq!(
+                    msg,
+                    "You cannot sign solana transactions using sign_message"
+                )
+            }
+            _ => panic!("Expected Generic error with specific message"),
+        }
     }
 
     #[test]

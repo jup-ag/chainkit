@@ -1474,6 +1474,8 @@ sealed class TransactionException(message: String): Exception(message) {
         
         class DecimalConversion(message: String) : TransactionException(message)
         
+        class SignMsgException(message: String) : TransactionException(message)
+        
         class Generic(message: String) : TransactionException(message)
         
 
@@ -1495,7 +1497,8 @@ public object FfiConverterTypeTransactionError : FfiConverterRustBuffer<Transact
             7 -> TransactionException.ParsingFailure(FfiConverterString.read(buf))
             8 -> TransactionException.InstructionException(FfiConverterString.read(buf))
             9 -> TransactionException.DecimalConversion(FfiConverterString.read(buf))
-            10 -> TransactionException.Generic(FfiConverterString.read(buf))
+            10 -> TransactionException.SignMsgException(FfiConverterString.read(buf))
+            11 -> TransactionException.Generic(FfiConverterString.read(buf))
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
         }
         
@@ -1543,8 +1546,12 @@ public object FfiConverterTypeTransactionError : FfiConverterRustBuffer<Transact
                 buf.putInt(9)
                 Unit
             }
-            is TransactionException.Generic -> {
+            is TransactionException.SignMsgException -> {
                 buf.putInt(10)
+                Unit
+            }
+            is TransactionException.Generic -> {
+                buf.putInt(11)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
