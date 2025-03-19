@@ -25,19 +25,11 @@ fi
 # Check if GitHub CLI is installed
 if ! command -v gh &> /dev/null; then
     echo "❌ GitHub CLI is required but not installed."
-    echo "Please run the create_github_release.sh script first."
     exit 1
 fi
 
 # Upload the AAR to the release
 RELEASE_TAG="$VERSION"
-
-# Check if the release exists
-if ! gh release view "$RELEASE_TAG" --repo "$REPO" &> /dev/null; then
-    echo "❌ Error: Release $RELEASE_TAG does not exist."
-    echo "Please run the create_github_release.sh script first."
-    exit 1
-fi
 
 # Upload the AAR to the release
 echo "📤 Uploading AAR to release $RELEASE_TAG..."

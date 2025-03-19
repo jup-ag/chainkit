@@ -49,34 +49,10 @@ echo "✅ Successfully created $ZIP_FILE"
 CHECKSUM=$(swift package compute-checksum "$ZIP_FILE")
 echo "🔑 Checksum: $CHECKSUM"
 
-# Check if GitHub CLI is installed
-if ! command -v gh &> /dev/null; then
-    echo "❌ GitHub CLI is required but not installed."
-    echo "Please run the create_github_release.sh script first."
-    exit 1
-fi
-
-# Check if the release exists
 RELEASE_TAG="$VERSION"
-if ! gh release view "$RELEASE_TAG" --repo "$REPO" &> /dev/null; then
-    echo "❌ Error: Release $RELEASE_TAG does not exist."
-    echo "Please run the create_github_release.sh script first."
-    exit 1
-fi
-
-# Upload the asset to the release
-echo "📤 Uploading asset to release..."
-gh release upload "$RELEASE_TAG" "$ZIP_FILE" --repo "$REPO" --clobber
 
 # Get the download URL
-DOWNLOAD_URL=$(gh release view "$RELEASE_TAG" --repo "$REPO" --json assets --jq ".assets[] | select(.name==\"ChainKitFFI-$VERSION.zip\") | .url")
-
-echo "✅ Upload complete!"
-echo ""
-echo "📋 Framework information:"
-echo "- Tag: $RELEASE_TAG"
-echo "- Download URL: $DOWNLOAD_URL"
-echo "- Checksum: $CHECKSUM"
+DOWNLOAD_URL="https://github.com/$REPO/releases/download/$VERSION/ChainKitFFI-$VERSION.zip"
 
 # Update Package.swift with the new URL and checksum
 echo "🔄 Updating Package.swift..."
