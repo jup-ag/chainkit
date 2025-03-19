@@ -126,17 +126,17 @@ pub struct Derivation {
 }
 
 impl Derivation {
-    pub fn paths(&self) -> Vec<String> {
-        let mut paths = Vec::new();
+    pub fn paths_with_index(&self) -> Vec<(u32, String)> {
+        let mut paths:Vec<(u32, String)> = Vec::new();
 
         match self.path {
             DerivationPath::Bip44Root => {
-                paths.push(self.path.format().to_string())
+                paths.push((0 as u32, self.path.format().to_string()))
             },
             _ => {
-                for i in self.start..self.start + self.count {
+                for i in self.start..(self.start + self.count) {
                     let path = format!("{}", self.path.format().replace("{}", &i.to_string()));
-                    paths.push(path);
+                    paths.push((i, path));
                 }
             }
         }

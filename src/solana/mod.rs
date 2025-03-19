@@ -93,7 +93,7 @@ impl PrivateKeyFactory for Factory {
 
         let seed = Seed::new(&mnemonic_phrase, passphrase.unwrap_or(""));
 
-        for (index, path_string) in derivation.paths().iter().enumerate() {
+        for (path_index, path_string) in derivation.paths_with_index().iter() {
             let path =
                 solana_sdk::derivation_path::DerivationPath::from_absolute_path_str(path_string)
                     .map_err(KeyError::derivation)?;
@@ -107,7 +107,7 @@ impl PrivateKeyFactory for Factory {
                     contents: keypair.pubkey().to_string(),
                     chain: Blockchain::Solana,
                 },
-                index: index as u32,
+                index: *path_index,
             };
 
             keys.push(key)
@@ -1204,19 +1204,45 @@ mod tests {
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
 
-        let derived_pubkeys: Vec<String> = output
+        let derived_pubkeys: Vec<(u32, String)> = output
             .iter()
-            .map(|kp| kp.public_key.contents.to_owned())
+            .map(|kp| (kp.index, kp.public_key.contents.to_owned()))
             .collect();
 
         assert_eq!(
             derived_pubkeys,
             vec![
-                "F7xVyQuLzvyUKbMQyrBHaqYGCzHWpmsocn8b7oRUyeC5",
-                "DdSeC77Fih7CeVmJLw6FPv8pVPzyjpMfUPGFXP5RZ7uF",
-                "HH5kWPVZXZSQPDSTb5TWrfnn3hbCuz3wHHgQ9Snrs5Hj",
-                "54YcaDwtMN2grT2qrHKHbs6eFKY4mA7uof6zqq6YKAuY",
-                "FCXWQT4Yx5AxV2Y5zr5PNdaK5Fi54RTT1cD1Z1nsQNoa"
+                (0 as u32, "F7xVyQuLzvyUKbMQyrBHaqYGCzHWpmsocn8b7oRUyeC5".to_string()),
+                (1 as u32, "DdSeC77Fih7CeVmJLw6FPv8pVPzyjpMfUPGFXP5RZ7uF".to_string()),
+                (2 as u32, "HH5kWPVZXZSQPDSTb5TWrfnn3hbCuz3wHHgQ9Snrs5Hj".to_string()),
+                (3 as u32, "54YcaDwtMN2grT2qrHKHbs6eFKY4mA7uof6zqq6YKAuY".to_string()),
+                (4 as u32, "FCXWQT4Yx5AxV2Y5zr5PNdaK5Fi54RTT1cD1Z1nsQNoa".to_string())
+            ]
+        );
+
+        // Tests deriving specific wallet
+        let mnemonic = MnemonicWords::from_str(
+            "ski seven shuffle amazing tooth net useful asthma drive crystal solar glare",
+        )
+        .unwrap();
+
+        let derivation = Derivation {
+            start: 4,
+            count: 1,
+            path: DerivationPath::Bip44Change
+        };
+
+        let output = Factory.derive(mnemonic, None, derivation).unwrap();
+
+        let derived_pubkeys: Vec<(u32, String)> = output
+            .iter()
+            .map(|kp| (kp.index, kp.public_key.contents.to_owned()))
+            .collect();
+
+        assert_eq!(
+            derived_pubkeys,
+            vec![
+                (4 as u32, "FCXWQT4Yx5AxV2Y5zr5PNdaK5Fi54RTT1cD1Z1nsQNoa".to_string())
             ]
         )
     }
