@@ -47,7 +47,16 @@ $(shell mkdir -p platforms/ios)
 
 # Default target to build both Apple and Android
 .PHONY: all
-all: dependencies apple android
+all: dependencies
+	@if [ -z "$(VERSION)" ]; then \
+		echo "ERROR: VERSION not specified"; \
+		echo "Usage: make all VERSION=x.y.z"; \
+		exit 1; \
+	fi
+	@echo "------> Building with version $(VERSION)"
+	@$(MAKE) apple
+	@$(MAKE) android
+	@$(MAKE) package VERSION=$(VERSION)
 
 # Check for required dependencies
 .PHONY: dependencies
@@ -180,7 +189,7 @@ release: dependencies
 	./scripts/prepare_aar_for_distribution.sh $(VERSION)'
 	@echo "------> Release v$(VERSION) completed!"
 
-# Run clean, all, and release in sequence
+# Run clean and all in sequence
 .PHONY: yolo
 yolo:
 	@if [ -z "$(VERSION)" ]; then \
@@ -189,16 +198,12 @@ yolo:
 		exit 1; \
 	fi
 
-	@echo "------> Starting YOLO build: clean, build all, and release with version $(VERSION)"
-	
-	$(call check_github_token)
+	@echo "------> Starting YOLO build: clean and build all with version $(VERSION)"
 	
 	@echo "------> Running make clean..."
 	@$(MAKE) clean
 	@echo "------> Running make all..."
-	@$(MAKE) all
-	@echo "------> Running make release VERSION=$(VERSION) with GITHUB_TOKEN..."
-	@$(MAKE) release VERSION=$(VERSION) GITHUB_TOKEN=$(GITHUB_TOKEN)
+	@$(MAKE) all VERSION=$(VERSION)
 	@echo "------> YOLO build completed successfully!"
 
 # Add a help target to explain available targets
@@ -614,4 +619,26 @@ define check_github_token
 			echo "------> GITHUB_TOKEN has required permissions for package publishing."; \
 		fi; \
 	fi
-endef	
+endef
+
+# Package the built binaries
+.PHONY: package
+package: dependencies
+	@if [ -z "$(VERSION)" ]; then \
+		echo "ERROR: VERSION not specified"; \
+		echo "Usage: make package VERSION=x.y.z"; \
+		exit 1; \
+	fi
+	@echo "------> Packaging version $(VERSION)"
+	@echo "------> Updating Package.swift..."
+	@if [ ! -f "./Package.swift" ]; then \
+		echo "ERROR: Package.swift not found at ./Package.swift"; \
+		exit 1; \
+	fi
+	@CHECKSUM=$$(shasum -a 256 platforms/ios/ChainKit/Sources/ChainKitFFI-$(VERSION).zip | cut -d' ' -f1) && \
+	sed -i '' \
+		-e 's|url: "https://github.com/chainkit/chainkit/releases/download/v[0-9]\+\.[0-9]\+\.[0-9]\+/ChainKitFFI-[0-9]\+\.[0-9]\+\.[0-9]\+\.zip"|url: "https://github.com/chainkit/chainkit/releases/download/v$(VERSION)/ChainKitFFI-$(VERSION).zip"|' \
+		-e 's|checksum: "[0-9a-f]\{64\}"|checksum: "$$CHECKSUM"|' \
+		./Package.swift
+	@echo "------> Package.swift updated successfully!"
+	@echo "------> Packaging completed!"	

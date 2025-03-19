@@ -22,8 +22,8 @@ let package = Package(
         ),
         .binaryTarget(
             name: "ChainKitFFI",
-            url: "https://github.com/jup-ag/chainkit/releases/download/1.2.9/ChainKitFFI-1.2.9.zip",
-            checksum: "0d99442dab931842afd38feb6209417cc24dc69336db2ab61bc15da08b5d0c9b"
+            url: "https://github.com/chainkit/chainkit/releases/download/v1.2.10/ChainKitFFI-1.2.10.zip",
+            checksum: "9ce596f39bcb2e8b93724e44ab0ea67fa5e03b8b14e6773e6a1045934358860f"
         )
     ]
 )
