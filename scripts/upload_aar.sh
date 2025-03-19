@@ -46,12 +46,19 @@ if command -v ./platforms/android/gradlew &> /dev/null; then
         echo "Please ensure you are authenticated with GitHub CLI."
         echo "Skipping GitHub Packages publication."
     else
-        # Execute gradle publish task with GitHub token and clobber flag
+        # Execute gradle publish task with GitHub token
         cd platforms/android
+        # First try to delete the existing version if it exists
+        echo "🔄 Checking for existing version..."
+        ./gradlew chainkit:deleteReleasePublicationFromGitHubPackagesRepository \
+            -PgithubToken="$GITHUB_TOKEN" \
+            -PlibraryVersion="$VERSION" || true
+        
+        # Then publish the new version
+        echo "📤 Publishing new version..."
         ./gradlew chainkit:publishReleasePublicationToGitHubPackagesRepository \
             -PgithubToken="$GITHUB_TOKEN" \
-            -PlibraryVersion="$VERSION" \
-            --clobber
+            -PlibraryVersion="$VERSION"
         cd -
         echo "✅ Published to GitHub Packages successfully!"
     fi

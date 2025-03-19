@@ -4,6 +4,9 @@ plugins {
     `maven-publish`
 }
 
+import java.net.URL
+import java.net.HttpURLConnection
+
 android {
     namespace = "uniffi"
     compileSdk = 35
@@ -97,6 +100,36 @@ publishing {
                 username = "github-actions"
                 password = githubToken
             }
+        }
+    }
+}
+
+// Add task to delete existing publications
+tasks.register("deleteReleasePublicationFromGitHubPackagesRepository") {
+    group = "publishing"
+    description = "Deletes the release publication from GitHub Packages"
+    
+    doLast {
+        val repo = publishing.repositories.getByName("GitHubPackages") as MavenArtifactRepository
+        val baseUrl = repo.url.toString()
+        val groupPath = "ag/jup/chainkit"
+        val artifactId = "chainkit"
+        val version = libraryVersion
+        
+        val url = "$baseUrl/$groupPath/$artifactId/$version"
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.requestMethod = "DELETE"
+        connection.setRequestProperty("Authorization", "token $githubToken")
+        
+        try {
+            val responseCode = connection.responseCode
+            if (responseCode == 204 || responseCode == 404) {
+                println("Successfully deleted or no existing publication found at $url")
+            } else {
+                println("Failed to delete publication. Response code: $responseCode")
+            }
+        } finally {
+            connection.disconnect()
         }
     }
 }
