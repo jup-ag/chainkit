@@ -46,11 +46,12 @@ if command -v ./platforms/android/gradlew &> /dev/null; then
         echo "Please ensure you are authenticated with GitHub CLI."
         echo "Skipping GitHub Packages publication."
     else
-        # Execute gradle publish task with GitHub token
+        # Execute gradle publish task with GitHub token and clobber flag
         cd platforms/android
         ./gradlew chainkit:publishReleasePublicationToGitHubPackagesRepository \
             -PgithubToken="$GITHUB_TOKEN" \
-            -PlibraryVersion="$VERSION"
+            -PlibraryVersion="$VERSION" \
+            --clobber
         cd -
         echo "✅ Published to GitHub Packages successfully!"
     fi

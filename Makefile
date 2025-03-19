@@ -183,8 +183,10 @@ release: dependencies
 	echo "------> Using GITHUB_TOKEN from environment for release..." && \
 	echo "------> Creating GitHub release..." && \
 	./scripts/create_github_release.sh $(VERSION) && \
-	echo "------> Preparing and uploading Android AAR..." && \
-	./scripts/prepare_aar_for_distribution.sh $(VERSION)'
+	echo "------> Uploading XCFramework..." && \
+	gh release upload "$(VERSION)" "platforms/ios/ChainKit/Sources/ChainKitFFI-$(VERSION).zip" --repo "jup-ag/chainkit" --clobber && \
+	echo "------> Uploading Android AAR..." && \
+	./scripts/upload_aar.sh $(VERSION)'
 	@echo "------> Release v$(VERSION) completed!"
 
 # Run clean and all in sequence
