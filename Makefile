@@ -165,16 +165,8 @@ release: dependencies
 	fi
 
 	@echo "------> Creating and uploading release with version $(VERSION)"
-
-	@echo "------> Checking for GITHUB_TOKEN..."
-	@if [ -z "$(GITHUB_TOKEN)" ]; then \
-		echo "GITHUB_TOKEN environment variable is not set."; \
-		echo "Please set it using: export GITHUB_TOKEN=your_token"; \
-		echo "Then run the command again."; \
-		exit 1; \
-	else \
-		echo "------> GITHUB_TOKEN found in environment"; \
-	fi
+	
+	$(call check_github_token)
 
 	@echo "------> Android architectures: $(ANDROID_ARCHS)"
 	@echo "------> NOTE: All architectures must build successfully for the release to complete."
@@ -199,15 +191,7 @@ yolo:
 
 	@echo "------> Starting YOLO build: clean, build all, and release with version $(VERSION)"
 	
-	@echo "------> Checking for GITHUB_TOKEN..."
-	@if [ -z "$(GITHUB_TOKEN)" ]; then \
-		echo "GITHUB_TOKEN environment variable is not set."; \
-		echo "Please set it using: export GITHUB_TOKEN=your_token"; \
-		echo "Then run the yolo command again."; \
-		exit 1; \
-	else \
-		echo "------> GITHUB_TOKEN found in environment"; \
-	fi
+	$(call check_github_token)
 	
 	@echo "------> Running make clean..."
 	@$(MAKE) clean
@@ -603,4 +587,31 @@ define check_rust_toolchain
 	for target in $(ANDROID_ARCHS); do \
 		rustup target add $$target; \
 	done'
+endef
+
+# Check if GitHub Token has package publishing permissions
+define check_github_token
+	@echo "------> Checking for GITHUB_TOKEN..."
+	@if [ -z "$(GITHUB_TOKEN)" ]; then \
+		echo "GITHUB_TOKEN environment variable is not set."; \
+		echo "Please set it using: export GITHUB_TOKEN=your_token"; \
+		echo "Then run the command again."; \
+		exit 1; \
+	else \
+		echo "------> GITHUB_TOKEN found in environment"; \
+		echo "------> Verifying GITHUB_TOKEN has package publishing permissions..."; \
+		SCOPES=$$(curl -s -I -H "Authorization: token $(GITHUB_TOKEN)" https://api.github.com/user | grep -i "X-OAuth-Scopes:" | cut -d: -f2- | tr -d ' '); \
+		echo "------> Token scopes: $$SCOPES"; \
+		if [ -z "$$SCOPES" ]; then \
+			echo "❌ ERROR: Could not detect token scopes - token may be invalid."; \
+			echo "Please ensure your token is valid."; \
+			exit 1; \
+		elif ! echo "$$SCOPES" | grep -q "write:packages\|repo"; then \
+			echo "❌ ERROR: GITHUB_TOKEN does not have package publishing permissions."; \
+			echo "Please ensure your token has the 'write:packages' scope or 'repo' scope."; \
+			exit 1; \
+		else \
+			echo "------> GITHUB_TOKEN has required permissions for package publishing."; \
+		fi; \
+	fi
 endef	
