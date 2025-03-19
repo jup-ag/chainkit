@@ -183,8 +183,6 @@ release: dependencies
 	echo "------> Using GITHUB_TOKEN from environment for release..." && \
 	echo "------> Creating GitHub release..." && \
 	./scripts/create_github_release.sh $(VERSION) && \
-	echo "------> Preparing and uploading XCFramework..." && \
-	./scripts/prepare_xcframework_for_distribution.sh $(VERSION) && \
 	echo "------> Preparing and uploading Android AAR..." && \
 	./scripts/prepare_aar_for_distribution.sh $(VERSION)'
 	@echo "------> Release v$(VERSION) completed!"
@@ -630,15 +628,6 @@ package: dependencies
 		exit 1; \
 	fi
 	@echo "------> Packaging version $(VERSION)"
-	@echo "------> Updating Package.swift..."
-	@if [ ! -f "./Package.swift" ]; then \
-		echo "ERROR: Package.swift not found at ./Package.swift"; \
-		exit 1; \
-	fi
-	@CHECKSUM=$$(swift package compute-checksum platforms/ios/ChainKit/Sources/ChainKitFFI-$(VERSION).zip) && \
-	sed -i '' \
-		-e 's|url: "https://github.com/chainkit/chainkit/releases/download/v[0-9]\+\.[0-9]\+\.[0-9]\+/ChainKitFFI-[0-9]\+\.[0-9]\+\.[0-9]\+\.zip"|url: "https://github.com/chainkit/chainkit/releases/download/v$(VERSION)/ChainKitFFI-$(VERSION).zip"|' \
-		-e "s|checksum: \"[0-9a-f]\{64\}\"|checksum: \"$$CHECKSUM\"|" \
-		./Package.swift
-	@echo "------> Package.swift updated successfully!"
+	@echo "------> Preparing and uploading XCFramework..."
+	@./scripts/prepare_xcframework_for_distribution.sh $(VERSION)
 	@echo "------> Packaging completed!"	
