@@ -24,32 +24,41 @@ export ANDROID_HOME=$HOME/Library/Android/sdk
 
 ## Creating a New Release
 
-To create a new release, run:
+The release process now follows these steps:
 
-```bash
-make release VERSION=x.y.z
-```
+1. Create a new feature branch from main
 
-This will:
+2. Implement your changes and test them locally.
 
-1. Create a new GitHub release with the specified version
-2. Package and upload the iOS XCFramework to the release
-3. Package and upload the Android AAR to the release
-4. Publish the Android AAR to GitHub Packages
+3. Build and package the changes:
+   ```bash
+   make yolo VERSION=x.y.z
+   ```
+   This will:
+   - Clean all build artifacts
+   - Build both Apple and Android platforms
+   - Package the binaries
+   - Update Package.swift with the correct checksum and URL
 
-For convenience, you can also use the "yolo" target which cleans, builds all platforms, and creates a release in one command:
+4. Create a Pull Request:
+   - Commit your changes including the updated Package.swift and generated source files
 
-```bash
-make yolo VERSION=x.y.z
-```
+5. After the PR is merged, create the release:
+   ```bash
+   make release VERSION=x.y.z
+   ```
+   This will:
+   - Create a new GitHub release
+   - Upload the iOS XCFramework to the release
+   - Upload the Android AAR to the release
 
 ## Release Scripts
 
-The release process is divided into three scripts:
+The release process uses these scripts:
 
 1. `scripts/create_github_release.sh` - Creates a new GitHub release
-2. `scripts/prepare_xcframework_for_distribution.sh` - Packages and uploads the iOS XCFramework
-3. `scripts/prepare_aar_for_distribution.sh` - Packages, uploads, and publishes the Android AAR
+2. `scripts/prepare_xcframework_for_distribution.sh` - Packages the iOS XCFramework
+3. `scripts/prepare_aar_for_distribution.sh` - Packages the Android AAR
 
 You can run these scripts individually if needed, but normally they are called by the `make release` command.
 

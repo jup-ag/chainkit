@@ -635,10 +635,10 @@ package: dependencies
 		echo "ERROR: Package.swift not found at ./Package.swift"; \
 		exit 1; \
 	fi
-	@CHECKSUM=$$(shasum -a 256 platforms/ios/ChainKit/Sources/ChainKitFFI-$(VERSION).zip | cut -d' ' -f1) && \
+	@CHECKSUM=$$(swift package compute-checksum platforms/ios/ChainKit/Sources/ChainKitFFI-$(VERSION).zip) && \
 	sed -i '' \
 		-e 's|url: "https://github.com/chainkit/chainkit/releases/download/v[0-9]\+\.[0-9]\+\.[0-9]\+/ChainKitFFI-[0-9]\+\.[0-9]\+\.[0-9]\+\.zip"|url: "https://github.com/chainkit/chainkit/releases/download/v$(VERSION)/ChainKitFFI-$(VERSION).zip"|' \
-		-e 's|checksum: "[0-9a-f]\{64\}"|checksum: "$$CHECKSUM"|' \
+		-e "s|checksum: \"[0-9a-f]\{64\}\"|checksum: \"$$CHECKSUM\"|" \
 		./Package.swift
 	@echo "------> Package.swift updated successfully!"
 	@echo "------> Packaging completed!"	

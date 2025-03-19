@@ -15,7 +15,7 @@ ChainKit can be built for Apple platforms (iOS/macOS) and Android.
 
 **Build for both platforms:**
 ```bash
-make
+make all VERSION=x.y.z
 ```
 
 **Build for Apple platforms only:**
@@ -44,17 +44,26 @@ After successful builds, the framework files will be located at:
 - **Android**: `platforms/android`
   - Native libraries for multiple architectures (arm64-v8a, armeabi-v7a, x86, x86_64)
 
-## Release
+## Release Process
 
-**Create a new (or override an existing) release and upload (previously built) binary frameworks:**
-```bash
-make release VERSION=1.0.0
-```
+The release process follows these steps:
 
-**Clean, build all, and release in one command:**
-```bash
-make yolo VERSION=1.0.0
-```
+1. Create a new feature branch from main
+
+2. Implement your changes and test them locally.
+
+3. Build and package the changes:
+   ```bash
+   make yolo VERSION=x.y.z
+   ```
+   This will clean, build all platforms, package the binaries, and update Package.swift.
+
+4. Create a Pull Request with your changes (including updated Package.swift and generated files).
+
+5. After PR merge, create the release:
+   ```bash
+   make release VERSION=x.y.z
+   ```
 
 Please see [RELEASE](https://github.com/jup-ag/chainkit/blob/main/RELEASE.md) for more details.
 
