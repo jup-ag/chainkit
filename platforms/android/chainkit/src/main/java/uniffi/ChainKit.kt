@@ -1008,7 +1008,9 @@ public object FfiConverterTypeDerivation: FfiConverterRustBuffer<Derivation> {
 data class DerivedPrivateKey (
     val `contents`: String, 
     val `publicKey`: ChainPublicKey, 
-    val `index`: UInt
+    val `index`: UInt, 
+    val `path`: String?, 
+    val `pathType`: DerivationPath?
 ) {
     
     companion object
@@ -1020,19 +1022,25 @@ public object FfiConverterTypeDerivedPrivateKey: FfiConverterRustBuffer<DerivedP
             FfiConverterString.read(buf),
             FfiConverterTypeChainPublicKey.read(buf),
             FfiConverterUInt.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalTypeDerivationPath.read(buf),
         )
     }
 
     override fun allocationSize(value: DerivedPrivateKey) = (
             FfiConverterString.allocationSize(value.`contents`) +
             FfiConverterTypeChainPublicKey.allocationSize(value.`publicKey`) +
-            FfiConverterUInt.allocationSize(value.`index`)
+            FfiConverterUInt.allocationSize(value.`index`) +
+            FfiConverterOptionalString.allocationSize(value.`path`) +
+            FfiConverterOptionalTypeDerivationPath.allocationSize(value.`pathType`)
     )
 
     override fun write(value: DerivedPrivateKey, buf: ByteBuffer) {
             FfiConverterString.write(value.`contents`, buf)
             FfiConverterTypeChainPublicKey.write(value.`publicKey`, buf)
             FfiConverterUInt.write(value.`index`, buf)
+            FfiConverterOptionalString.write(value.`path`, buf)
+            FfiConverterOptionalTypeDerivationPath.write(value.`pathType`, buf)
     }
 }
 
@@ -1957,6 +1965,35 @@ public object FfiConverterOptionalTypeExternalAddress: FfiConverterRustBuffer<Ex
         } else {
             buf.put(1)
             FfiConverterTypeExternalAddress.write(value, buf)
+        }
+    }
+}
+
+
+
+
+public object FfiConverterOptionalTypeDerivationPath: FfiConverterRustBuffer<DerivationPath?> {
+    override fun read(buf: ByteBuffer): DerivationPath? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeDerivationPath.read(buf)
+    }
+
+    override fun allocationSize(value: DerivationPath?): Int {
+        if (value == null) {
+            return 1
+        } else {
+            return 1 + FfiConverterTypeDerivationPath.allocationSize(value)
+        }
+    }
+
+    override fun write(value: DerivationPath?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeDerivationPath.write(value, buf)
         }
     }
 }

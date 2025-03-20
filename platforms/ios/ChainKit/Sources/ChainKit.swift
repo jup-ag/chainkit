@@ -739,16 +739,22 @@ public struct DerivedPrivateKey {
     public var contents: String
     public var publicKey: ChainPublicKey
     public var index: UInt32
+    public var path: String?
+    public var pathType: DerivationPath?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(
         contents: String, 
         publicKey: ChainPublicKey, 
-        index: UInt32) {
+        index: UInt32, 
+        path: String?, 
+        pathType: DerivationPath?) {
         self.contents = contents
         self.publicKey = publicKey
         self.index = index
+        self.path = path
+        self.pathType = pathType
     }
 }
 
@@ -764,6 +770,12 @@ extension DerivedPrivateKey: Equatable, Hashable {
         if lhs.index != rhs.index {
             return false
         }
+        if lhs.path != rhs.path {
+            return false
+        }
+        if lhs.pathType != rhs.pathType {
+            return false
+        }
         return true
     }
 
@@ -771,6 +783,8 @@ extension DerivedPrivateKey: Equatable, Hashable {
         hasher.combine(contents)
         hasher.combine(publicKey)
         hasher.combine(index)
+        hasher.combine(path)
+        hasher.combine(pathType)
     }
 }
 
@@ -781,7 +795,9 @@ public struct FfiConverterTypeDerivedPrivateKey: FfiConverterRustBuffer {
             try DerivedPrivateKey(
                 contents: FfiConverterString.read(from: &buf), 
                 publicKey: FfiConverterTypeChainPublicKey.read(from: &buf), 
-                index: FfiConverterUInt32.read(from: &buf)
+                index: FfiConverterUInt32.read(from: &buf), 
+                path: FfiConverterOptionString.read(from: &buf), 
+                pathType: FfiConverterOptionTypeDerivationPath.read(from: &buf)
         )
     }
 
@@ -789,6 +805,8 @@ public struct FfiConverterTypeDerivedPrivateKey: FfiConverterRustBuffer {
         FfiConverterString.write(value.contents, into: &buf)
         FfiConverterTypeChainPublicKey.write(value.publicKey, into: &buf)
         FfiConverterUInt32.write(value.index, into: &buf)
+        FfiConverterOptionString.write(value.path, into: &buf)
+        FfiConverterOptionTypeDerivationPath.write(value.pathType, into: &buf)
     }
 }
 
@@ -1817,6 +1835,27 @@ fileprivate struct FfiConverterOptionTypeExternalAddress: FfiConverterRustBuffer
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeExternalAddress.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+fileprivate struct FfiConverterOptionTypeDerivationPath: FfiConverterRustBuffer {
+    typealias SwiftType = DerivationPath?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeDerivationPath.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeDerivationPath.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
