@@ -158,6 +158,8 @@ pub struct DerivedPrivateKey {
     pub contents: String,
     pub public_key: ChainPublicKey,
     pub index: u32,
+    pub path: Option<String>,
+    pub path_type: Option<DerivationPath>,
 }
 
 /// Representation of a private key.

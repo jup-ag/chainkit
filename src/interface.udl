@@ -53,6 +53,8 @@ dictionary DerivedPrivateKey {
     string contents;
     ChainPublicKey public_key;
     u32 index;
+    string? path;
+    DerivationPath? path_type;
 };
 
 dictionary ChainPrivateKey {
