@@ -108,6 +108,8 @@ impl PrivateKeyFactory for Factory {
                     chain: Blockchain::Solana,
                 },
                 index: *path_index,
+                path: Some(path_string.clone()),
+                path_type: Some(derivation.path)
             };
 
             keys.push(key)
@@ -135,6 +137,8 @@ impl PrivateKeyFactory for Factory {
                 chain: Blockchain::Solana,
             },
             index: 0,
+            path: None,
+            path_type: None
         };
 
         Ok(key)
