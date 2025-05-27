@@ -2115,11 +2115,13 @@ mod tests {
         let tx_legacy_msg_b64 = base64::encode(bincode::serialize(&tx_legacy.message).unwrap());
         let message_b64 = base64::encode(bincode::serialize(&message).unwrap());
         assert_eq!(tx_legacy_msg_b64, message_b64);
-        
+
         // Test versioned message
         let tx_versioned_b64 = Factory.get_transaction(versioned_b64.clone()).unwrap();
         let tx_versioned: VersionedTransaction = bincode::deserialize(&base64::decode(&tx_versioned_b64).unwrap()).unwrap();
-        assert_eq!(tx_versioned.message, versioned_msg);
+        let tx_versioned_msg_b64 = base64::encode(bincode::serialize(&tx_versioned.message).unwrap());
+        let versioned_msg_b64 = base64::encode(bincode::serialize(&versioned_msg).unwrap());
+        assert_eq!(tx_versioned_msg_b64, versioned_msg_b64);
 
         // Test invalid base64
         let invalid = Factory.get_transaction("not-base64".to_string());
