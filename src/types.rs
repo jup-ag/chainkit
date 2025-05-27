@@ -91,6 +91,8 @@ pub trait TransactionFactory {
 
     fn get_message(&self, transaction: String) -> Result<String, TransactionError>;
 
+    fn get_transaction(&self, message: String) -> Result<String, TransactionError>;
+
     fn append_signature_to_transaction(&self, signer: String, signature: String, transaction: String) -> Result<String, TransactionError>;
 }
 

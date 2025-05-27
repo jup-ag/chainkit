@@ -776,6 +776,34 @@ impl TransactionFactory for Factory {
         ))))
     }
 
+    fn get_transaction(&self, message: String) -> Result<String, TransactionError> {
+        let message_bytes = from_base64(&message).map_err(TransactionError::parsing_failure)?;
+
+        // Try VersionedMessage first
+        if let Ok(versioned_msg) = bincode::deserialize::<VersionedMessage>(&message_bytes) {
+            let tx = VersionedTransaction {
+                signatures: vec![Signature::default()], // Placeholder signature
+                message: versioned_msg,
+            };
+            let tx_bytes = bincode::serialize(&tx).map_err(TransactionError::parsing_failure)?;
+            return Ok(to_base64(tx_bytes));
+        }
+
+        // Try Legacy Message
+        if let Ok(message) = bincode::deserialize::<Message>(&message_bytes) {
+            let tx = Transaction {
+                signatures: vec![Signature::default()], // Placeholder signature
+                message,
+            };
+            let tx_bytes = bincode::serialize(&tx).map_err(TransactionError::parsing_failure)?;
+            return Ok(to_base64(tx_bytes));
+        }
+
+        Err(TransactionError::parsing_failure(Error::ErrorString(
+            "Failed to parse message".to_string(),
+        )))
+    }
+
     fn append_signature_to_transaction(&self, signer: String, signature: String, transaction: String) -> Result<String, TransactionError> {
         let transaction_bytes = from_base64(&transaction).map_err(TransactionError::parsing_failure)?;
         let sig_bytes = bs58::decode(&signature).into_vec().map_err(TransactionError::parsing_failure)?;
@@ -2061,6 +2089,41 @@ mod tests {
         // Test invalid transaction message extraction
         let result = Factory.get_message("invalid base64".to_string());
         assert!(result.is_err());
+    }
+    
+    #[test]
+    fn test_get_transaction() {
+        let sender = Keypair::new();
+        let receiver_pubkey = Pubkey::from_str("HhjkkWaHbMLLve8mmRsvpVkPQ8hz8Dt5BvXA5y7S92Hz").unwrap();
+
+        let amount_in_sol = 0.0001;
+        let lamports = (amount_in_sol * 1_000_000_000.0) as u64;
+
+        let instruction = system_instruction::transfer(&sender.pubkey(), &receiver_pubkey, lamports);
+        let message = Message::new(&[instruction], Some(&sender.pubkey()));
+
+        let legacy_bytes = bincode::serialize(&message).unwrap();
+        let legacy_b64 = base64::encode(&legacy_bytes);
+
+        let versioned_msg = VersionedMessage::Legacy(message.clone());
+        let versioned_bytes = bincode::serialize(&versioned_msg).unwrap();
+        let versioned_b64 = base64::encode(&versioned_bytes);
+
+        // Test legacy message
+        let tx_legacy_b64 = Factory.get_transaction(legacy_b64.clone()).unwrap();
+        let tx_legacy: Transaction = bincode::deserialize(&base64::decode(&tx_legacy_b64).unwrap()).unwrap();
+        let tx_legacy_msg_b64 = base64::encode(bincode::serialize(&tx_legacy.message).unwrap());
+        let message_b64 = base64::encode(bincode::serialize(&message).unwrap());
+        assert_eq!(tx_legacy_msg_b64, message_b64);
+        
+        // Test versioned message
+        let tx_versioned_b64 = Factory.get_transaction(versioned_b64.clone()).unwrap();
+        let tx_versioned: VersionedTransaction = bincode::deserialize(&base64::decode(&tx_versioned_b64).unwrap()).unwrap();
+        assert_eq!(tx_versioned.message, versioned_msg);
+
+        // Test invalid base64
+        let invalid = Factory.get_transaction("not-base64".to_string());
+        assert!(invalid.is_err());
     }
 
     #[test]

@@ -168,6 +168,10 @@ pub fn get_message(transaction: String) -> Result<String, TransactionError> {
     solana::Factory.get_message(transaction)
 }
 
+pub fn get_transaction(message: String) -> Result<String, TransactionError> {
+    solana::Factory.get_transaction(message)
+}
+
 pub fn append_signature_to_transaction(signer: String, signature: String, transaction: String) -> Result<String, TransactionError> {
     solana::Factory.append_signature_to_transaction(signer, signature, transaction)
 }
