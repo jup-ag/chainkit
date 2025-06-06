@@ -64,3 +64,4 @@ lto = true        # Enable Link Time Optimization
 opt-level = 'z'   # Optimize for size.
 panic = 'unwind'  # Abort on panic
 debug = true      # Enable debug symbols. For example, we can use `dwarfdump` to check crash traces.
+strip = false     # Explicitly prevent stripping debug symbols

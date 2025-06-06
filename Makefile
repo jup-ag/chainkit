@@ -29,7 +29,7 @@ STATIC_LIB_NAME := libchainkit.a
 ENABLE_X86 ?= false
 ENABLE_SIMULATOR ?= true
 
-# Android configuration  
+# Android configuration
 ANDROID_HOME ?= $(shell echo $$ANDROID_HOME || echo $(HOME)/Library/Android/sdk)
 ANDROID_NDK_VERSION ?= 28.0.12433566
 ANDROID_PLATFORM ?= 28
@@ -105,14 +105,14 @@ android: dependencies
 	@echo "------> Configuration: $(CONFIGURATION), Folder: $(FOLDER)"
 	@echo "------> NDK Version: $(ANDROID_NDK_VERSION), Platform: $(ANDROID_PLATFORM)"
 	@echo "------> Building for architectures: $(ANDROID_ARCHS)"
-	
+
 	@echo "------> Running tests..."
 	bash -c '$(RUST_ENV) && cargo test'
-	
+
 	# Build the libraries
 	@echo "------> Building libraries..."
 	bash -c '$(RUST_ENV) && $(call build_android_libs)'
-	
+
 	# Create directories for libraries
 	@echo "------> Creating directories..."
 	mkdir -p platforms/android/chainkit/src/main/jniLibs
@@ -120,7 +120,7 @@ android: dependencies
 	mkdir -p platforms/android/chainkit/src/main/jniLibs/armeabi-v7a
 	mkdir -p platforms/android/chainkit/src/main/jniLibs/x86
 	mkdir -p platforms/android/chainkit/src/main/jniLibs/x86_64
-	
+
 	# Copy libraries to appropriate directories
 	@echo "------> Copying libraries..."
 	cp target/aarch64-linux-android/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/arm64-v8a/libuniffi_ChainKit.so
@@ -131,12 +131,12 @@ android: dependencies
 	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/i686-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/x86/libc++_shared.so
 	cp target/x86_64-linux-android/$(FOLDER)/libchainkit.so platforms/android/chainkit/src/main/jniLibs/x86_64/libuniffi_ChainKit.so
 	cp $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so platforms/android/chainkit/src/main/jniLibs/x86_64/libc++_shared.so
-	
+
 	# Generate Kotlin bindings
 	@echo "------> Generating Kotlin bindings..."
 	bash -c '$(RUST_ENV) && cargo run --manifest-path Cargo.toml --features="uniffi/cli" --bin uniffi-bindgen generate src/interface.udl --language kotlin --out-dir platforms/android/chainkit/src/main/java'
 	@echo "------> Kotlin bindings generated successfully!"
-	
+
 	# Build AAR
 	@echo "------> Building Android AAR with Gradle..."
 	@if [ -n "$(ANDROID_HOME)" ]; then \
@@ -144,7 +144,7 @@ android: dependencies
 	fi
 	@cd platforms/android && ./gradlew chainkit:assembleRelease
 	@echo "------> Android AAR built successfully at platforms/android/chainkit/build/outputs/aar/chainkit-release.aar"
-	
+
 	@echo "------> Android build completed successfully!"
 
 # Clean all build artifacts
@@ -174,7 +174,7 @@ release: dependencies
 	fi
 
 	@echo "------> Creating and uploading release with version $(VERSION)"
-	
+
 	$(call check_github_token)
 
 	@echo "------> Android architectures: $(ANDROID_ARCHS)"
@@ -199,7 +199,7 @@ yolo:
 	fi
 
 	@echo "------> Starting YOLO build: clean and build all with version $(VERSION)"
-	
+
 	@echo "------> Running make clean..."
 	@$(MAKE) clean
 	@echo "------> Running make all..."
@@ -253,6 +253,7 @@ endef
 define assemble_apple_frameworks
 	echo "------> Removing existing frameworks..."; \
 	find . -type d -name ChainKitFFI.framework -exec rm -rf {} \; 2>/dev/null || echo "No existing frameworks found"; \
+	find . -name "*.dSYM" -exec rm -rf {} \; 2>/dev/null || echo "No existing dSYM files found"; \
 	echo "------> Checking for static libraries..."; \
 	echo "------> Looking for iOS static library at: target/aarch64-apple-ios/$(FOLDER)/$(STATIC_LIB_NAME)"; \
 	ls -la target/aarch64-apple-ios/$(FOLDER)/$(STATIC_LIB_NAME) || echo "❌ ERROR: iOS static library not found"; \
@@ -297,6 +298,8 @@ define assemble_apple_frameworks
 	cp generated/ChainKitFFI.h target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework/Headers/; \
 	cp target/aarch64-apple-ios/$(FOLDER)/$(STATIC_LIB_NAME) target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI; \
 	cp resources/Info.plist target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework/; \
+	echo "------> Generating dSYM for iOS framework..."; \
+	dsymutil target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI -o target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework.dSYM || echo "Warning: Could not generate dSYM for iOS framework"; \
 	echo "✅ Successfully created iOS framework"; \
 	echo "------> Frameworks assembled. Checking..."; \
 	find . -name "ChainKitFFI.framework" | sort
@@ -306,6 +309,7 @@ endef
 define create_xcframework
 	echo "------> Creating XCFramework..."; \
 	rm -rf target/ChainKitFFI.xcframework || echo "skip removing"; \
+	rm -rf target/ChainKitFFI.xcframework.dSYM || echo "skip removing dSYM"; \
 	echo "------> Combining targets for XCFramework..."; \
 	mkdir -p target/ChainKitFFI.xcframework; \
 	echo "------> ENABLE_X86 set to: $(ENABLE_X86)"; \
@@ -318,28 +322,36 @@ define create_xcframework
 					target/x86_64-apple-ios/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI \
 					target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI \
 					-output target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI; \
+				echo "------> Generating dSYM for simulator fat binary..."; \
+				dsymutil target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI -o target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework.dSYM || echo "Warning: Could not generate dSYM for simulator"; \
 			elif [ -d "target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework" ]; then \
 				echo "------> Creating simulator binary..."; \
 				lipo -create \
 					target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI \
 					-output target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI; \
+				echo "------> Generating dSYM for simulator..."; \
+				dsymutil target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework/ChainKitFFI -o target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework.dSYM || echo "Warning: Could not generate dSYM for simulator"; \
 			fi; \
 			if [ -d "target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework" ]; then \
 				echo "------> Creating XCFramework with device and simulator..."; \
 				xcodebuild -create-xcframework \
 					-framework target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework \
+					-debug-symbols target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework.dSYM \
 					-framework target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework \
+					-debug-symbols target/aarch64-apple-ios-sim/$(FOLDER)/ChainKitFFI.framework.dSYM \
 					-output target/ChainKitFFI.xcframework; \
 			else \
 				echo "------> Creating XCFramework with device only (simulator not found)..."; \
 				xcodebuild -create-xcframework \
 					-framework target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework \
+					-debug-symbols target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework.dSYM \
 					-output target/ChainKitFFI.xcframework; \
 			fi; \
 		else \
 			echo "------> Creating XCFramework with device only..."; \
 			xcodebuild -create-xcframework \
 				-framework target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework \
+				-debug-symbols target/aarch64-apple-ios/$(FOLDER)/ChainKitFFI.framework.dSYM \
 				-output target/ChainKitFFI.xcframework; \
 		fi; \
 	fi
@@ -498,7 +510,7 @@ endef
 define build_android_libs
 	set -x && \
 	CC=/usr/bin/cc \
-	CARGO_PROFILE_RELEASE_STRIP=$(if $(findstring release,$(FOLDER)),true,false) \
+	CARGO_PROFILE_RELEASE_STRIP=false \
 	ANDROID_NDK_HOME=$(ANDROID_NDK_HOME) \
 	cargo \
 		--verbose \
@@ -632,4 +644,4 @@ package: dependencies
 	@echo "------> Packaging version $(VERSION)"
 	@echo "------> Preparing and uploading XCFramework..."
 	@./scripts/prepare_xcframework_for_distribution.sh $(VERSION)
-	@echo "------> Packaging completed!"	
+	@echo "------> Packaging completed!"
