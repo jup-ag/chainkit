@@ -1,7 +1,0 @@
-[bindings]
-doc_comments = true
-
-[bindings.kotlin]
-package_name = "uniffi"
-generate_immutable_records = true
-android = true
