@@ -88,7 +88,7 @@ dictionary ChainTransaction {
 
 [Enum]
 interface TransactionData {
-  Solana();
+  Solana(sequence<string> signatures);
 };
 
 [Enum]

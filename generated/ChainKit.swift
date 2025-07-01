@@ -1357,7 +1357,9 @@ extension TokenDestination: Equatable, Hashable {}
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 public enum TransactionData {
     
-    case solana
+    case solana(
+        signatures: [String]
+    )
 }
 
 public struct FfiConverterTypeTransactionData: FfiConverterRustBuffer {
@@ -1367,7 +1369,9 @@ public struct FfiConverterTypeTransactionData: FfiConverterRustBuffer {
         let variant: Int32 = try readInt(&buf)
         switch variant {
         
-        case 1: return .solana
+        case 1: return .solana(
+            signatures: try FfiConverterSequenceString.read(from: &buf)
+        )
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -1377,9 +1381,10 @@ public struct FfiConverterTypeTransactionData: FfiConverterRustBuffer {
         switch value {
         
         
-        case .solana:
+        case let .solana(signatures):
             writeInt(&buf, Int32(1))
-        
+            FfiConverterSequenceString.write(signatures, into: &buf)
+            
         }
     }
 }

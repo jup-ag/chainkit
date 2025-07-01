@@ -1,4 +1,4 @@
-use bip39::{Language, Mnemonic, Seed, MnemonicType};
+use bip39::{Language, Mnemonic, MnemonicType, Seed};
 use bs58;
 use hex;
 use rust_decimal::{prelude::FromPrimitive, Decimal, Error};
@@ -8,18 +8,20 @@ use solana_sdk::{
     compute_budget::ComputeBudgetInstruction,
     hash,
     instruction::AccountMeta,
+    message::Message,
     message::VersionedMessage,
     pubkey::Pubkey,
-    signature::{keypair_from_seed, keypair_from_seed_and_derivation_path, Keypair, Signature, Signer},
+    signature::{
+        keypair_from_seed, keypair_from_seed_and_derivation_path, Keypair, Signature, Signer,
+    },
     signer::SignerError,
-    transaction::{Transaction, VersionedTransaction},
     system_instruction,
-    message::{Message}
+    transaction::{Transaction, VersionedTransaction},
 };
 use spl_memo::build_memo;
 use spl_token::instruction::TokenInstruction;
-use types::ExternalAddress;
 use std::str::FromStr;
+use types::ExternalAddress;
 
 use super::types::*;
 use crate::errors::*;
@@ -41,19 +43,17 @@ const INVITE_ESCROW_PROGRAM: &str = "inv1tEtSwRMtM44tbvJGNiTxMvDfPVnX9StyqXfDfks
 const ALLOWED_PROGRAMS: [&str; 3] = [TOKEN_2022_PROGRAM, SPL_PROGRAM, INVITE_ESCROW_PROGRAM];
 
 impl UtilsFactory for Factory {
-    fn generate_mnemonic(
-            &self,
-            length: u32
-        ) -> Result<MnemonicWords, KeyError> {
-
+    fn generate_mnemonic(&self, length: u32) -> Result<MnemonicWords, KeyError> {
         // Ensure the mnemonic length is valid, for deriving we support only 12 and 24 words,
         // therefore for creating also gonna support only that
         let mnemonic_type = match length {
             12 => MnemonicType::Words12,
             24 => MnemonicType::Words24,
-            _ => return Err(KeyError::InvalidMnemonic(
-                "Only 12 or 24 word mnemonics are supported".to_string(),
-             )),
+            _ => {
+                return Err(KeyError::InvalidMnemonic(
+                    "Only 12 or 24 word mnemonics are supported".to_string(),
+                ))
+            }
         };
 
         // Generate the mnemonic
@@ -65,7 +65,8 @@ impl UtilsFactory for Factory {
         }
 
         // Convert mnemonic phrase to Vec<String>
-        let words: Vec<String> = mnemonic.phrase()
+        let words: Vec<String> = mnemonic
+            .phrase()
             .split_whitespace()
             .map(String::from)
             .collect();
@@ -98,9 +99,8 @@ impl PrivateKeyFactory for Factory {
                 solana_sdk::derivation_path::DerivationPath::from_absolute_path_str(path_string)
                     .map_err(KeyError::derivation)?;
 
-            let keypair =
-                keypair_from_seed_and_derivation_path(seed.as_bytes(), Some(path))
-                    .map_err(|e| KeyError::Generic(format!("Invalid Keypair: {e:?}")))?;
+            let keypair = keypair_from_seed_and_derivation_path(seed.as_bytes(), Some(path))
+                .map_err(|e| KeyError::Generic(format!("Invalid Keypair: {e:?}")))?;
             let key = DerivedPrivateKey {
                 contents: keypair.to_base58_string(),
                 public_key: ChainPublicKey {
@@ -109,7 +109,7 @@ impl PrivateKeyFactory for Factory {
                 },
                 index: *path_index,
                 path: Some(path_string.clone()),
-                path_type: Some(derivation.path)
+                path_type: Some(derivation.path),
             };
 
             keys.push(key)
@@ -118,18 +118,14 @@ impl PrivateKeyFactory for Factory {
         Ok(keys)
     }
 
-    fn derive_from_data(
-        &self,
-        data: &str,
-    ) -> Result<DerivedPrivateKey, KeyError> {
+    fn derive_from_data(&self, data: &str) -> Result<DerivedPrivateKey, KeyError> {
         let mut hasher = Sha256::new();
         hasher.update(data.as_bytes());
         let hashed_data = hasher.finalize();
         let seed: &[u8] = &hashed_data;
 
-        let keypair =
-                keypair_from_seed(seed)
-                    .map_err(|e| KeyError::Generic(format!("Invalid Keypair: {e:?}")))?;
+        let keypair = keypair_from_seed(seed)
+            .map_err(|e| KeyError::Generic(format!("Invalid Keypair: {e:?}")))?;
         let key = DerivedPrivateKey {
             contents: keypair.to_base58_string(),
             public_key: ChainPublicKey {
@@ -138,7 +134,7 @@ impl PrivateKeyFactory for Factory {
             },
             index: 0,
             path: None,
-            path_type: None
+            path_type: None,
         };
 
         Ok(key)
@@ -253,11 +249,13 @@ impl TransactionFactory for Factory {
                 .parse::<hash::Hash>()
                 .map_err(TransactionError::parsing_failure)?;
 
-            versioned_transaction.message.set_recent_blockhash(recent_blockhash);
+            versioned_transaction
+                .message
+                .set_recent_blockhash(recent_blockhash);
         }
 
-        let serialized_tx =
-            bincode::serialize(&versioned_transaction).map_err(TransactionError::parsing_failure)?;
+        let serialized_tx = bincode::serialize(&versioned_transaction)
+            .map_err(TransactionError::parsing_failure)?;
 
         Ok(to_base64(serialized_tx))
     }
@@ -343,7 +341,8 @@ impl TransactionFactory for Factory {
                         );
                     }
 
-                    let transaction = Transaction::new_with_payer(&instructions, Some(&owner_pubkey));
+                    let transaction =
+                        Transaction::new_with_payer(&instructions, Some(&owner_pubkey));
                     let mut versioned_transaction = VersionedTransaction::from(transaction);
 
                     if let Some(external_address) = parameters.external_address() {
@@ -352,7 +351,9 @@ impl TransactionFactory for Factory {
                             .parse::<hash::Hash>()
                             .map_err(TransactionError::parsing_failure)?;
 
-                        versioned_transaction.message.set_recent_blockhash(recent_blockhash);
+                        versioned_transaction
+                            .message
+                            .set_recent_blockhash(recent_blockhash);
                     }
 
                     let serialized_tx = bincode::serialize(&versioned_transaction)
@@ -416,7 +417,8 @@ impl TransactionFactory for Factory {
                         );
                     }
 
-                    let transaction = Transaction::new_with_payer(&instructions, Some(&owner_pubkey));
+                    let transaction =
+                        Transaction::new_with_payer(&instructions, Some(&owner_pubkey));
                     let mut versioned_transaction = VersionedTransaction::from(transaction);
 
                     if let Some(external_address) = parameters.external_address() {
@@ -425,7 +427,9 @@ impl TransactionFactory for Factory {
                             .parse::<hash::Hash>()
                             .map_err(TransactionError::parsing_failure)?;
 
-                        versioned_transaction.message.set_recent_blockhash(recent_blockhash);
+                        versioned_transaction
+                            .message
+                            .set_recent_blockhash(recent_blockhash);
                     }
 
                     let serialized_tx = bincode::serialize(&versioned_transaction)
@@ -533,15 +537,15 @@ impl TransactionFactory for Factory {
                             .iter()
                             .map(|signer| signer.public_key.clone())
                             .collect(),
-                            accounts: versioned_tx
-                                .message
-                                .static_account_keys()
-                                .iter()
-                                .map(|pubkey| ChainPublicKey {
-                                    contents: bs58::encode(pubkey).into_string(),
-                                    chain: Blockchain::Solana,
-                                })
-                                .collect(),
+                        accounts: versioned_tx
+                            .message
+                            .static_account_keys()
+                            .iter()
+                            .map(|pubkey| ChainPublicKey {
+                                contents: bs58::encode(pubkey).into_string(),
+                                chain: Blockchain::Solana,
+                            })
+                            .collect(),
                         full_signature: calculate_signature(&versioned_tx.signatures),
                         signatures: signatures_to_base58(&versioned_tx.signatures),
                         instruction_programs: get_instruction_programs(versioned_tx.message),
@@ -605,15 +609,15 @@ impl TransactionFactory for Factory {
                                     .iter()
                                     .map(|signer| signer.public_key.clone())
                                     .collect(),
-                                    accounts: transaction
-                                        .message
-                                        .static_account_keys()
-                                        .iter()
-                                        .map(|pubkey| ChainPublicKey {
-                                            contents: bs58::encode(pubkey).into_string(),
-                                            chain: Blockchain::Solana,
-                                        })
-                                        .collect(),
+                                accounts: transaction
+                                    .message
+                                    .static_account_keys()
+                                    .iter()
+                                    .map(|pubkey| ChainPublicKey {
+                                        contents: bs58::encode(pubkey).into_string(),
+                                        chain: Blockchain::Solana,
+                                    })
+                                    .collect(),
                                 full_signature: calculate_signature(&transaction.signatures),
                                 signatures: signatures_to_base58(&transaction.signatures),
                                 instruction_programs: get_instruction_programs(transaction.message),
@@ -681,9 +685,32 @@ impl TransactionFactory for Factory {
 
     fn parse_transaction(
         &self,
-        _transaction: String,
+        transaction: String,
     ) -> Result<ParsedTransaction, TransactionError> {
-        todo!()
+        let transaction_bytes =
+            from_base64(&transaction).map_err(TransactionError::parsing_failure)?;
+        let signatures = if let Ok(versioned_tx) =
+            bincode::deserialize::<VersionedTransaction>(&transaction_bytes)
+        {
+            versioned_tx
+                .signatures
+                .iter()
+                .map(|sig| sig.to_string())
+                .collect()
+        } else if let Ok(tx) = bincode::deserialize::<Transaction>(&transaction_bytes) {
+            tx.signatures.iter().map(|sig| sig.to_string()).collect()
+        } else {
+            vec![]
+        };
+
+        Ok(ParsedTransaction {
+            from: None,
+            to: ChainPublicKey {
+                contents: "".to_string(),
+                chain: Blockchain::Solana,
+            },
+            data: TransactionData::Solana { signatures },
+        })
     }
 
     fn get_associated_token_address(
@@ -692,9 +719,12 @@ impl TransactionFactory for Factory {
         owner_program: String,
         token_mint_address: String,
     ) -> Result<ChainPublicKey, TransactionError> {
-        let wallet_address_pubkey = Pubkey::from_str(&wallet_address).map_err(TransactionError::public_key)?;
-        let owner_program_pubkey = Pubkey::from_str(&owner_program).map_err(TransactionError::public_key)?;
-        let token_mint_address_pubkey = Pubkey::from_str(&token_mint_address).map_err(TransactionError::public_key)?;
+        let wallet_address_pubkey =
+            Pubkey::from_str(&wallet_address).map_err(TransactionError::public_key)?;
+        let owner_program_pubkey =
+            Pubkey::from_str(&owner_program).map_err(TransactionError::public_key)?;
+        let token_mint_address_pubkey =
+            Pubkey::from_str(&token_mint_address).map_err(TransactionError::public_key)?;
 
         if !is_program_allowed(&owner_program_pubkey) {
             return Err(TransactionError::InstructionError(
@@ -705,7 +735,7 @@ impl TransactionFactory for Factory {
         let generated_associated_token_account = associated_token_address_2022(
             &wallet_address_pubkey,
             &owner_program_pubkey,
-            &token_mint_address_pubkey
+            &token_mint_address_pubkey,
         );
 
         Ok(ChainPublicKey {
@@ -747,10 +777,7 @@ impl TransactionFactory for Factory {
         let seeds_u8_refs: Vec<&[u8]> = seeds_u8.iter().map(|v| v.as_slice()).collect();
 
         // Generate the program address (PDA)
-        let program_address = Pubkey::find_program_address(
-            &seeds_u8_refs,
-            &program_pub_key,
-        ).0;
+        let program_address = Pubkey::find_program_address(&seeds_u8_refs, &program_pub_key).0;
 
         Ok(ChainPublicKey {
             contents: program_address.to_owned().to_string(),
@@ -759,38 +786,60 @@ impl TransactionFactory for Factory {
     }
 
     fn get_message(&self, transaction: String) -> Result<String, TransactionError> {
-        let transaction_bytes = from_base64(&transaction).map_err(TransactionError::parsing_failure)?;
+        let transaction_bytes =
+            from_base64(&transaction).map_err(TransactionError::parsing_failure)?;
 
         if let Ok(versioned_tx) = bincode::deserialize::<VersionedTransaction>(&transaction_bytes) {
-            let message_bytes = bincode::serialize(&versioned_tx.message).map_err(TransactionError::parsing_failure)?;
+            let message_bytes = bincode::serialize(&versioned_tx.message)
+                .map_err(TransactionError::parsing_failure)?;
             return Ok(to_base64(message_bytes));
         }
 
         if let Ok(tx) = bincode::deserialize::<Transaction>(&transaction_bytes) {
-            let message_bytes = bincode::serialize(&tx.message).map_err(TransactionError::parsing_failure)?;
+            let message_bytes =
+                bincode::serialize(&tx.message).map_err(TransactionError::parsing_failure)?;
             return Ok(to_base64(message_bytes));
         }
 
-        Err(TransactionError::parsing_failure(TransactionError::parsing_failure(Error::ErrorString(
-            "Failed to parse transaction".to_string(),
-        ))))
+        Err(TransactionError::parsing_failure(
+            TransactionError::parsing_failure(Error::ErrorString(
+                "Failed to parse transaction".to_string(),
+            )),
+        ))
     }
 
-    fn append_signature_to_transaction(&self, signer: String, signature: String, transaction: String) -> Result<String, TransactionError> {
-        let transaction_bytes = from_base64(&transaction).map_err(TransactionError::parsing_failure)?;
-        let sig_bytes = bs58::decode(&signature).into_vec().map_err(TransactionError::parsing_failure)?;
-        let signature = Signature::try_from(sig_bytes.as_slice()).map_err(TransactionError::parsing_failure)?;
+    fn append_signature_to_transaction(
+        &self,
+        signer: String,
+        signature: String,
+        transaction: String,
+    ) -> Result<String, TransactionError> {
+        let transaction_bytes =
+            from_base64(&transaction).map_err(TransactionError::parsing_failure)?;
+        let sig_bytes = bs58::decode(&signature)
+            .into_vec()
+            .map_err(TransactionError::parsing_failure)?;
+        let signature =
+            Signature::try_from(sig_bytes.as_slice()).map_err(TransactionError::parsing_failure)?;
         let pubkey = Pubkey::from_str(&signer).map_err(TransactionError::public_key)?;
 
-        if let Ok(mut versioned_tx) = bincode::deserialize::<VersionedTransaction>(&transaction_bytes) {
+        if let Ok(mut versioned_tx) =
+            bincode::deserialize::<VersionedTransaction>(&transaction_bytes)
+        {
             // Find position of signer in account keys
             let account_keys = versioned_tx.message.static_account_keys();
-            let signer_position = account_keys.iter().position(|key| *key == pubkey).ok_or_else(|| TransactionError::Generic("Signer not found in account keys".to_string()))?;
+            let signer_position = account_keys
+                .iter()
+                .position(|key| *key == pubkey)
+                .ok_or_else(|| {
+                    TransactionError::Generic("Signer not found in account keys".to_string())
+                })?;
 
             // Insert signature at correct position
             if signer_position < versioned_tx.signatures.len() {
                 versioned_tx.signatures[signer_position] = signature;
-                let serialized_tx = bincode::serialize(&versioned_tx).map_err(TransactionError::parsing_failure)?;
+                let serialized_tx =
+                    bincode::serialize(&versioned_tx).map_err(TransactionError::parsing_failure)?;
                 return Ok(to_base64(serialized_tx));
             }
         }
@@ -798,20 +847,27 @@ impl TransactionFactory for Factory {
         if let Ok(mut tx) = bincode::deserialize::<Transaction>(&transaction_bytes) {
             // Find position of signer in account keys
             let account_keys = &tx.message.account_keys;
-            let signer_position = account_keys.iter().position(|key| *key == pubkey).ok_or_else(|| TransactionError::Generic("Signer not found in account keys".to_string()))?;
+            let signer_position = account_keys
+                .iter()
+                .position(|key| *key == pubkey)
+                .ok_or_else(|| {
+                    TransactionError::Generic("Signer not found in account keys".to_string())
+                })?;
 
             // Insert signature at correct position
             if signer_position < tx.signatures.len() {
                 tx.signatures[signer_position] = signature;
-                let serialized_tx = bincode::serialize(&tx).map_err(TransactionError::parsing_failure)?;
+                let serialized_tx =
+                    bincode::serialize(&tx).map_err(TransactionError::parsing_failure)?;
                 return Ok(to_base64(serialized_tx));
             }
         }
 
-        Err(TransactionError::Generic("Failed to append signature to transaction".to_string()))
+        Err(TransactionError::Generic(
+            "Failed to append signature to transaction".to_string(),
+        ))
     }
 }
-
 
 fn calculate_signature(signatures: &Vec<Signature>) -> Option<String> {
     if signatures.is_empty() {
@@ -889,7 +945,9 @@ impl TransactionParameters {
         *compute_budget_unit_limit
     }
     fn external_address(&self) -> Option<ExternalAddress> {
-        let TransactionParameters::Solana { external_address, .. } = &self;
+        let TransactionParameters::Solana {
+            external_address, ..
+        } = &self;
         external_address.clone()
     }
 }
@@ -1082,7 +1140,10 @@ mod tests {
     fn test_generate_mnemonic_invalid_length() {
         let result = Factory.generate_mnemonic(18);
 
-        assert!(result.is_err(), "Expected error for invalid mnemonic length");
+        assert!(
+            result.is_err(),
+            "Expected error for invalid mnemonic length"
+        );
 
         if let Err(KeyError::InvalidMnemonic(msg)) = result {
             assert_eq!(msg, "Only 12 or 24 word mnemonics are supported");
@@ -1114,7 +1175,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 1,
-            path: DerivationPath::Bip44Root
+            path: DerivationPath::Bip44Root,
         };
 
         let sender = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1156,7 +1217,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 1,
-            path: DerivationPath::Bip44Change
+            path: DerivationPath::Bip44Change,
         };
 
         let sender = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1184,7 +1245,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 2,
-            path: DerivationPath::Bip44Change
+            path: DerivationPath::Bip44Change,
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1203,7 +1264,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 5,
-            path: DerivationPath::Bip44Change
+            path: DerivationPath::Bip44Change,
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1216,11 +1277,26 @@ mod tests {
         assert_eq!(
             derived_pubkeys,
             vec![
-                (0 as u32, "F7xVyQuLzvyUKbMQyrBHaqYGCzHWpmsocn8b7oRUyeC5".to_string()),
-                (1 as u32, "DdSeC77Fih7CeVmJLw6FPv8pVPzyjpMfUPGFXP5RZ7uF".to_string()),
-                (2 as u32, "HH5kWPVZXZSQPDSTb5TWrfnn3hbCuz3wHHgQ9Snrs5Hj".to_string()),
-                (3 as u32, "54YcaDwtMN2grT2qrHKHbs6eFKY4mA7uof6zqq6YKAuY".to_string()),
-                (4 as u32, "FCXWQT4Yx5AxV2Y5zr5PNdaK5Fi54RTT1cD1Z1nsQNoa".to_string())
+                (
+                    0 as u32,
+                    "F7xVyQuLzvyUKbMQyrBHaqYGCzHWpmsocn8b7oRUyeC5".to_string()
+                ),
+                (
+                    1 as u32,
+                    "DdSeC77Fih7CeVmJLw6FPv8pVPzyjpMfUPGFXP5RZ7uF".to_string()
+                ),
+                (
+                    2 as u32,
+                    "HH5kWPVZXZSQPDSTb5TWrfnn3hbCuz3wHHgQ9Snrs5Hj".to_string()
+                ),
+                (
+                    3 as u32,
+                    "54YcaDwtMN2grT2qrHKHbs6eFKY4mA7uof6zqq6YKAuY".to_string()
+                ),
+                (
+                    4 as u32,
+                    "FCXWQT4Yx5AxV2Y5zr5PNdaK5Fi54RTT1cD1Z1nsQNoa".to_string()
+                )
             ]
         );
 
@@ -1233,7 +1309,7 @@ mod tests {
         let derivation = Derivation {
             start: 4,
             count: 1,
-            path: DerivationPath::Bip44Change
+            path: DerivationPath::Bip44Change,
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1245,9 +1321,10 @@ mod tests {
 
         assert_eq!(
             derived_pubkeys,
-            vec![
-                (4 as u32, "FCXWQT4Yx5AxV2Y5zr5PNdaK5Fi54RTT1cD1Z1nsQNoa".to_string())
-            ]
+            vec![(
+                4 as u32,
+                "FCXWQT4Yx5AxV2Y5zr5PNdaK5Fi54RTT1cD1Z1nsQNoa".to_string()
+            )]
         )
     }
 
@@ -1261,7 +1338,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 2,
-            path: DerivationPath::Bip44Change
+            path: DerivationPath::Bip44Change,
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1286,7 +1363,7 @@ mod tests {
         let derivation = Derivation {
             start: 0,
             count: 2,
-            path: DerivationPath::Bip44Change
+            path: DerivationPath::Bip44Change,
         };
 
         let output = Factory.derive(mnemonic, None, derivation).unwrap();
@@ -1948,11 +2025,13 @@ mod tests {
 
     #[test]
     fn test_correct_associated_token_address() {
-        let result = Factory.get_associated_token_address(
-            "HhjkkWaHbMLLve8mmRsvpVkPQ8hz8Dt5BvXA5y7S92Hz".to_string(),
-            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA".to_string(),
-            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string()
-        ).unwrap();
+        let result = Factory
+            .get_associated_token_address(
+                "HhjkkWaHbMLLve8mmRsvpVkPQ8hz8Dt5BvXA5y7S92Hz".to_string(),
+                "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA".to_string(),
+                "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
+            )
+            .unwrap();
 
         assert_eq!(
             result.contents,
@@ -1965,7 +2044,7 @@ mod tests {
         let result = Factory.get_associated_token_address(
             "something_wrong".to_string(),
             "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA".to_string(),
-            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string()
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
         );
 
         if !matches!(result, Err(TransactionError::PublicKey(_))) {
@@ -1975,13 +2054,16 @@ mod tests {
 
     #[test]
     fn test_correct_program_address() {
-        let result = Factory.get_program_address(
-            [
-                "invite".to_string(),
-                "c8Zhu3498MhJ98PBc7CmPj3oCRJ1HZaB6gPZU3r58kJ".to_string()
-            ].to_vec(),
-            "inv1tEtSwRMtM44tbvJGNiTxMvDfPVnX9StyqXfDfks".to_string()
-        ).unwrap();
+        let result = Factory
+            .get_program_address(
+                [
+                    "invite".to_string(),
+                    "c8Zhu3498MhJ98PBc7CmPj3oCRJ1HZaB6gPZU3r58kJ".to_string(),
+                ]
+                .to_vec(),
+                "inv1tEtSwRMtM44tbvJGNiTxMvDfPVnX9StyqXfDfks".to_string(),
+            )
+            .unwrap();
 
         assert_eq!(
             result.contents,
@@ -1991,13 +2073,12 @@ mod tests {
 
     #[test]
     fn test_wrong_program_address() {
-        let result = Factory.get_program_address(
-            [
-                "invite".to_string(),
-                "wrong".to_string()
-            ].to_vec(),
-            "inv1tEtSwRMtM44tbvJGNiTxMvDfPVnX9StyqXfDfks".to_string()
-        ).unwrap();
+        let result = Factory
+            .get_program_address(
+                ["invite".to_string(), "wrong".to_string()].to_vec(),
+                "inv1tEtSwRMtM44tbvJGNiTxMvDfPVnX9StyqXfDfks".to_string(),
+            )
+            .unwrap();
 
         assert_ne!(
             result.contents,
@@ -2007,13 +2088,8 @@ mod tests {
 
     #[test]
     fn test_exception_program_address() {
-        let result = Factory.get_program_address(
-            [
-                "1".to_string(),
-                "2".to_string()
-            ].to_vec(),
-            "3".to_string()
-        );
+        let result = Factory
+            .get_program_address(["1".to_string(), "2".to_string()].to_vec(), "3".to_string());
 
         if !matches!(result, Err(TransactionError::PublicKey(_))) {
             panic!("Broken keys should not be parsed")
@@ -2022,17 +2098,15 @@ mod tests {
 
     #[test]
     fn test_get_message() {
-        let sender_pubkey = Pubkey::from_str("7vEitk7AmNJVJqwtsVsxSJkAhYQ4oHWXQadeDUeD4iMy").unwrap();
-        let receiver_pubkey = Pubkey::from_str("HhjkkWaHbMLLve8mmRsvpVkPQ8hz8Dt5BvXA5y7S92Hz").unwrap();
+        let sender_pubkey =
+            Pubkey::from_str("7vEitk7AmNJVJqwtsVsxSJkAhYQ4oHWXQadeDUeD4iMy").unwrap();
+        let receiver_pubkey =
+            Pubkey::from_str("HhjkkWaHbMLLve8mmRsvpVkPQ8hz8Dt5BvXA5y7S92Hz").unwrap();
 
         let amount_in_sol = 0.0001;
         let lamports = (amount_in_sol * 1_000_000_000.0) as u64;
 
-        let instruction = system_instruction::transfer(
-            &sender_pubkey,
-            &receiver_pubkey,
-            lamports,
-        );
+        let instruction = system_instruction::transfer(&sender_pubkey, &receiver_pubkey, lamports);
 
         let message = Message::new(&[instruction], Some(&sender_pubkey));
         let serialized_message = bincode::serialize(&message).unwrap();
@@ -2112,5 +2186,19 @@ mod tests {
             base_64_unsigned_tx,
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_transaction() {
+        let base_64_signed_tx = "AYTk34Oql2cYQmaF+V5kRmhk3snfBwWCsSaFrpUKojPDG0tseRVrPy4mDPBf7W2dP+ipfw4mm6eubsMT17cKdwUBAAoT0cva94tdeUJahExxXl5yoYrk1nsxlCWaSqvYqqppa6YRmJQz2BPHWeODDKN8Qtx9iPTXJqZBIdulNKq1NcTf7jOzHsTv+PoomuqMlUwBYy4tdkkIzlRNaGW97xEb/2ErRbSgDpkuuIlAxLykw4mGod2nd6ziifou4usSCxcEWihty/B1SeAdNCE/corYRxO1txeHL6w4E8q5Y68xLI3bzW8pOWiySsYpNA+F1v5c0yUnlsvwURGDQhu0yesZsdXTkF98aN834lf+Eb3lP/B6CzO3Amsn1E2Gfu77h7qH/CGUn5HzpNhL87Ljrhp5ZwCQzOu6oNRrlR0hBxy7aLDv167AdbKQTIZo4sepWTNMK23MjtaNesDAMU08VgSaH3F4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WQMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAAu6nN/XmuJp8Db7aXm0uYp3KSexdu9rcZZXaHIfHx8uTsgRBREqJX1h30z18T7gobAZGXyMU0O08qfsiEauIsGu8Ni2/aLOukHaFdQJXR2jkqDS+O0MbHvA9M+sjCgLVtBpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAEGm4uYWqtTKkUJDehVf83cvmy378c6CmWwb5IDXbc+7Aan1RcZLFxRIYzJTD1K8X9Y2u4Im6H9ROPb2YoAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKlmcm3QJD5/XiE4nDDqNootQizJhe85xH/7f7PQFMjncAkLAAUC4JMEAAsACQOVdQAAAAAAAAkCAAF8AwAAANHL2veLXXlCWoRMcV5ecqGK5NZ7MZQlmkqr2KqqaWumIAAAAAAAAAA0VXBEMmZoN3hIM1ZQOVFRYVh0c1MxWVkzYnh6V2h0ZsCnlwAAAAAAFAUAAAAAAAAGm4uYWqtTKkUJDehVf83cvmy378c6CmWwb5IDXbc+7BAFAQIAERIBBgkCAAgMAgAAAJCkIAAAAAAACgcACAAPCRIRAAoHAAYAAwkSEQAQDggGBAUDAgwHAQAODQASCQ6ghgEAAAAAABIDCAAAAQk=".to_string();
+
+        let parsed_transaction = Factory
+            .parse_transaction(base_64_signed_tx.clone())
+            .unwrap();
+
+        // Check that the parsed transaction contains the expected number of signatures
+        let TransactionData::Solana { signatures, .. } = &parsed_transaction.data;
+        assert_eq!(signatures.len(), 1);
+        assert_eq!(signatures[0].to_string(), "3f75BQ998yqJbEqMo78TSTMJk7phRZha1q298t7FbSUi54kPCrLv4yrBrQdE7tUEmBTLUAswjrMVAGgxpDyXAHzL".to_string());
     }
 }
