@@ -74,7 +74,7 @@ pub trait TransactionFactory {
     ) -> Result<String, TransactionError>;
 
     fn parse_transaction(&self, transaction: String)
-        -> Result<ParsedTransaction, TransactionError>;
+        -> Result<ChainTransaction, TransactionError>;
 
     fn get_associated_token_address(
         &self,
@@ -177,13 +177,6 @@ pub struct ChainPrivateKey {
 pub struct ChainPublicKey {
     pub contents: String,
     pub chain: Blockchain,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ParsedTransaction {
-    pub from: Option<ChainPublicKey>,
-    pub to: ChainPublicKey,
-    pub data: TransactionData,
 }
 
 /// Expose transaction internals that the client might need to

@@ -145,7 +145,7 @@ pub fn modify_transaction(
 pub fn parse_transaction(
     chain: Blockchain,
     transaction: String,
-) -> Result<ParsedTransaction, TransactionError> {
+) -> Result<ChainTransaction, TransactionError> {
     chain.tx_factory().parse_transaction(transaction)
 }
 
