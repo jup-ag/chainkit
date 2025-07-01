@@ -1421,8 +1421,12 @@ public object FfiConverterTypeTokenDestination : FfiConverterRustBuffer<TokenDes
 
 sealed class TransactionData {
     
-    object Solana : TransactionData()
-    
+    data class Solana(
+        
+        val `signatures`: List<String>
+        ) : TransactionData() {
+        companion object
+    }
     
 
     
@@ -1432,7 +1436,9 @@ sealed class TransactionData {
 public object FfiConverterTypeTransactionData : FfiConverterRustBuffer<TransactionData>{
     override fun read(buf: ByteBuffer): TransactionData {
         return when(buf.getInt()) {
-            1 -> TransactionData.Solana
+            1 -> TransactionData.Solana(
+                FfiConverterSequenceString.read(buf),
+                )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
         }
     }
@@ -1442,6 +1448,7 @@ public object FfiConverterTypeTransactionData : FfiConverterRustBuffer<Transacti
             // Add the size for the Int that specifies the variant plus the size needed for all fields
             (
                 4
+                + FfiConverterSequenceString.allocationSize(value.`signatures`)
             )
         }
     }
@@ -1450,6 +1457,7 @@ public object FfiConverterTypeTransactionData : FfiConverterRustBuffer<Transacti
         when(value) {
             is TransactionData.Solana -> {
                 buf.putInt(1)
+                FfiConverterSequenceString.write(value.`signatures`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
