@@ -71,12 +71,6 @@ dictionary DecimalNumber {
     string value;
 };
 
-dictionary ParsedTransaction {
-    ChainPublicKey? from;
-    ChainPublicKey to;
-    TransactionData data;
-};
-
 dictionary ChainTransaction {
   string tx;
   sequence<ChainPublicKey> signers;
@@ -174,7 +168,7 @@ namespace ChainKit {
 
   // Parse a transaction string and return the contents
   [Throws=TransactionError]
-  ParsedTransaction parse_transaction(Blockchain chain, string transaction);
+  ChainTransaction parse_transaction(Blockchain chain, string transaction);
 
   // Encryption Related functions
   [Throws=EncryptionError]
