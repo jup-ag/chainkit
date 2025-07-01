@@ -681,9 +681,27 @@ impl TransactionFactory for Factory {
 
     fn parse_transaction(
         &self,
-        _transaction: String,
+        transaction: String,
     ) -> Result<ParsedTransaction, TransactionError> {
-        todo!()
+        let transaction_bytes = from_base64(&transaction).map_err(TransactionError::parsing_failure)?;
+        let signatures = if let Ok(versioned_tx) = bincode::deserialize::<VersionedTransaction>(&transaction_bytes) {
+            versioned_tx.signatures.iter().map(|sig| sig.to_string()).collect()
+        } else if let Ok(tx) = bincode::deserialize::<Transaction>(&transaction_bytes) {
+            tx.signatures.iter().map(|sig| sig.to_string()).collect()
+        } else {
+            vec![]
+        };
+
+        Ok(ParsedTransaction {
+            from: None,
+            to: ChainPublicKey {
+                contents: "".to_string(),
+                chain: Blockchain::Solana,
+            },
+            data: TransactionData::Solana {
+                signatures,
+            },
+        })
     }
 
     fn get_associated_token_address(

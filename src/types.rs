@@ -190,7 +190,9 @@ pub struct ParsedTransaction {
 /// know about
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TransactionData {
-    Solana,
+    Solana{
+        signatures: Vec<String>
+    },
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Default)]
