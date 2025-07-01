@@ -683,34 +683,61 @@ impl TransactionFactory for Factory {
         todo!()
     }
 
-    fn parse_transaction(
-        &self,
-        transaction: String,
-    ) -> Result<ParsedTransaction, TransactionError> {
+    fn parse_transaction(&self, transaction: String) -> Result<ChainTransaction, TransactionError> {
         let transaction_bytes =
             from_base64(&transaction).map_err(TransactionError::parsing_failure)?;
-        let signatures = if let Ok(versioned_tx) =
-            bincode::deserialize::<VersionedTransaction>(&transaction_bytes)
-        {
-            versioned_tx
-                .signatures
-                .iter()
-                .map(|sig| sig.to_string())
-                .collect()
-        } else if let Ok(tx) = bincode::deserialize::<Transaction>(&transaction_bytes) {
-            tx.signatures.iter().map(|sig| sig.to_string()).collect()
-        } else {
-            vec![]
-        };
 
-        Ok(ParsedTransaction {
-            from: None,
-            to: ChainPublicKey {
-                contents: "".to_string(),
-                chain: Blockchain::Solana,
-            },
-            data: TransactionData::Solana { signatures },
-        })
+        // Try to parse as VersionedTransaction first
+        if let Ok(versioned_tx) = bincode::deserialize::<VersionedTransaction>(&transaction_bytes) {
+            let accounts = versioned_tx
+                .message
+                .static_account_keys()
+                .iter()
+                .map(|pubkey| ChainPublicKey {
+                    contents: bs58::encode(pubkey).into_string(),
+                    chain: Blockchain::Solana,
+                })
+                .collect();
+
+            return Ok(ChainTransaction {
+                tx: transaction,
+                signers: vec![], // Not available from serialized tx
+                accounts,
+                full_signature: calculate_signature(&versioned_tx.signatures),
+                signatures: signatures_to_base58(&versioned_tx.signatures),
+                instruction_programs: get_instruction_programs(versioned_tx.message),
+            });
+        }
+
+        // Try to parse as legacy Transaction
+        if let Ok(tx) = bincode::deserialize::<Transaction>(&transaction_bytes) {
+            let accounts = tx
+                .message
+                .account_keys
+                .iter()
+                .map(|pubkey| ChainPublicKey {
+                    contents: bs58::encode(pubkey).into_string(),
+                    chain: Blockchain::Solana,
+                })
+                .collect();
+
+            return Ok(ChainTransaction {
+                tx: transaction,
+                signers: vec![], // Not available from serialized tx
+                accounts,
+                full_signature: calculate_signature(&tx.signatures),
+                signatures: signatures_to_base58(&tx.signatures),
+                instruction_programs: get_instruction_programs(VersionedMessage::Legacy(
+                    tx.message,
+                )),
+            });
+        }
+
+        Err(TransactionError::parsing_failure(
+            TransactionError::parsing_failure(Error::ErrorString(
+                "Failed to parse transaction".to_string(),
+            )),
+        ))
     }
 
     fn get_associated_token_address(
@@ -2192,13 +2219,34 @@ mod tests {
     fn test_parse_transaction() {
         let base_64_signed_tx = "AYTk34Oql2cYQmaF+V5kRmhk3snfBwWCsSaFrpUKojPDG0tseRVrPy4mDPBf7W2dP+ipfw4mm6eubsMT17cKdwUBAAoT0cva94tdeUJahExxXl5yoYrk1nsxlCWaSqvYqqppa6YRmJQz2BPHWeODDKN8Qtx9iPTXJqZBIdulNKq1NcTf7jOzHsTv+PoomuqMlUwBYy4tdkkIzlRNaGW97xEb/2ErRbSgDpkuuIlAxLykw4mGod2nd6ziifou4usSCxcEWihty/B1SeAdNCE/corYRxO1txeHL6w4E8q5Y68xLI3bzW8pOWiySsYpNA+F1v5c0yUnlsvwURGDQhu0yesZsdXTkF98aN834lf+Eb3lP/B6CzO3Amsn1E2Gfu77h7qH/CGUn5HzpNhL87Ljrhp5ZwCQzOu6oNRrlR0hBxy7aLDv167AdbKQTIZo4sepWTNMK23MjtaNesDAMU08VgSaH3F4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACMlyWPTiSJ8bs9ECkUjg2DC1oTmdr/EIQEjnvY2+n4WQMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAAu6nN/XmuJp8Db7aXm0uYp3KSexdu9rcZZXaHIfHx8uTsgRBREqJX1h30z18T7gobAZGXyMU0O08qfsiEauIsGu8Ni2/aLOukHaFdQJXR2jkqDS+O0MbHvA9M+sjCgLVtBpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAEGm4uYWqtTKkUJDehVf83cvmy378c6CmWwb5IDXbc+7Aan1RcZLFxRIYzJTD1K8X9Y2u4Im6H9ROPb2YoAAAAABt324ddloZPZy+FGzut5rBy0he1fWzeROoz1hX7/AKlmcm3QJD5/XiE4nDDqNootQizJhe85xH/7f7PQFMjncAkLAAUC4JMEAAsACQOVdQAAAAAAAAkCAAF8AwAAANHL2veLXXlCWoRMcV5ecqGK5NZ7MZQlmkqr2KqqaWumIAAAAAAAAAA0VXBEMmZoN3hIM1ZQOVFRYVh0c1MxWVkzYnh6V2h0ZsCnlwAAAAAAFAUAAAAAAAAGm4uYWqtTKkUJDehVf83cvmy378c6CmWwb5IDXbc+7BAFAQIAERIBBgkCAAgMAgAAAJCkIAAAAAAACgcACAAPCRIRAAoHAAYAAwkSEQAQDggGBAUDAgwHAQAODQASCQ6ghgEAAAAAABIDCAAAAQk=".to_string();
 
-        let parsed_transaction = Factory
+        // Parse the transaction and check the result
+        let parsed = Factory
             .parse_transaction(base_64_signed_tx.clone())
             .unwrap();
 
-        // Check that the parsed transaction contains the expected number of signatures
-        let TransactionData::Solana { signatures, .. } = &parsed_transaction.data;
-        assert_eq!(signatures.len(), 1);
-        assert_eq!(signatures[0].to_string(), "3f75BQ998yqJbEqMo78TSTMJk7phRZha1q298t7FbSUi54kPCrLv4yrBrQdE7tUEmBTLUAswjrMVAGgxpDyXAHzL".to_string());
+        // Check tx matches input
+        assert_eq!(parsed.tx, base_64_signed_tx);
+
+        // Check signatures
+        assert_eq!(
+            parsed.full_signature,
+            Some("3f75BQ998yqJbEqMo78TSTMJk7phRZha1q298t7FbSUi54kPCrLv4yrBrQdE7tUEmBTLUAswjrMVAGgxpDyXAHzL".to_string())
+        );
+        assert_eq!(
+            parsed.signatures,
+            Some(vec!["3f75BQ998yqJbEqMo78TSTMJk7phRZha1q298t7FbSUi54kPCrLv4yrBrQdE7tUEmBTLUAswjrMVAGgxpDyXAHzL".to_string()])
+        );
+
+        // Check accounts
+        assert_eq!(
+            parsed.accounts[0].contents,
+            "F7xVyQuLzvyUKbMQyrBHaqYGCzHWpmsocn8b7oRUyeC5"
+        );
+        assert_eq!(parsed.accounts[0].chain, Blockchain::Solana);
+
+        // Check instruction programs
+        assert!(parsed
+            .instruction_programs
+            .contains(&"11111111111111111111111111111111".to_string()));
     }
 }

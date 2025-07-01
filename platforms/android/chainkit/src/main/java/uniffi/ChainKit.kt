@@ -630,7 +630,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_chainkit_checksum_func_parse_public_key() != 39267.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_chainkit_checksum_func_parse_transaction() != 46478.toShort()) {
+    if (lib.uniffi_chainkit_checksum_func_parse_transaction() != 61500.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_chainkit_checksum_func_raw_private_key() != 30293.toShort()) {
@@ -1091,39 +1091,6 @@ public object FfiConverterTypeMnemonicWords: FfiConverterRustBuffer<MnemonicWord
 
     override fun write(value: MnemonicWords, buf: ByteBuffer) {
             FfiConverterSequenceString.write(value.`words`, buf)
-    }
-}
-
-
-
-data class ParsedTransaction (
-    val `from`: ChainPublicKey?, 
-    val `to`: ChainPublicKey, 
-    val `data`: TransactionData
-) {
-    
-    companion object
-}
-
-public object FfiConverterTypeParsedTransaction: FfiConverterRustBuffer<ParsedTransaction> {
-    override fun read(buf: ByteBuffer): ParsedTransaction {
-        return ParsedTransaction(
-            FfiConverterOptionalTypeChainPublicKey.read(buf),
-            FfiConverterTypeChainPublicKey.read(buf),
-            FfiConverterTypeTransactionData.read(buf),
-        )
-    }
-
-    override fun allocationSize(value: ParsedTransaction) = (
-            FfiConverterOptionalTypeChainPublicKey.allocationSize(value.`from`) +
-            FfiConverterTypeChainPublicKey.allocationSize(value.`to`) +
-            FfiConverterTypeTransactionData.allocationSize(value.`data`)
-    )
-
-    override fun write(value: ParsedTransaction, buf: ByteBuffer) {
-            FfiConverterOptionalTypeChainPublicKey.write(value.`from`, buf)
-            FfiConverterTypeChainPublicKey.write(value.`to`, buf)
-            FfiConverterTypeTransactionData.write(value.`data`, buf)
     }
 }
 
@@ -2279,8 +2246,8 @@ fun `parsePublicKey`(`address`: String): ChainPublicKey? {
 
 @Throws(TransactionException::class)
 
-fun `parseTransaction`(`chain`: Blockchain, `transaction`: String): ParsedTransaction {
-    return FfiConverterTypeParsedTransaction.lift(
+fun `parseTransaction`(`chain`: Blockchain, `transaction`: String): ChainTransaction {
+    return FfiConverterTypeChainTransaction.lift(
     uniffiRustCallWithError(TransactionException) { _status ->
     UniffiLib.INSTANCE.uniffi_chainkit_fn_func_parse_transaction(FfiConverterTypeBlockchain.lower(`chain`),FfiConverterString.lower(`transaction`),_status)
 })
