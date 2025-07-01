@@ -917,73 +917,6 @@ public func FfiConverterTypeMnemonicWords_lower(_ value: MnemonicWords) -> RustB
     return FfiConverterTypeMnemonicWords.lower(value)
 }
 
-
-public struct ParsedTransaction {
-    public var from: ChainPublicKey?
-    public var to: ChainPublicKey
-    public var data: TransactionData
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(
-        from: ChainPublicKey?, 
-        to: ChainPublicKey, 
-        data: TransactionData) {
-        self.from = from
-        self.to = to
-        self.data = data
-    }
-}
-
-
-extension ParsedTransaction: Equatable, Hashable {
-    public static func ==(lhs: ParsedTransaction, rhs: ParsedTransaction) -> Bool {
-        if lhs.from != rhs.from {
-            return false
-        }
-        if lhs.to != rhs.to {
-            return false
-        }
-        if lhs.data != rhs.data {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(from)
-        hasher.combine(to)
-        hasher.combine(data)
-    }
-}
-
-
-public struct FfiConverterTypeParsedTransaction: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ParsedTransaction {
-        return
-            try ParsedTransaction(
-                from: FfiConverterOptionTypeChainPublicKey.read(from: &buf), 
-                to: FfiConverterTypeChainPublicKey.read(from: &buf), 
-                data: FfiConverterTypeTransactionData.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: ParsedTransaction, into buf: inout [UInt8]) {
-        FfiConverterOptionTypeChainPublicKey.write(value.from, into: &buf)
-        FfiConverterTypeChainPublicKey.write(value.to, into: &buf)
-        FfiConverterTypeTransactionData.write(value.data, into: &buf)
-    }
-}
-
-
-public func FfiConverterTypeParsedTransaction_lift(_ buf: RustBuffer) throws -> ParsedTransaction {
-    return try FfiConverterTypeParsedTransaction.lift(buf)
-}
-
-public func FfiConverterTypeParsedTransaction_lower(_ value: ParsedTransaction) -> RustBuffer {
-    return FfiConverterTypeParsedTransaction.lower(value)
-}
-
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 public enum Blockchain {
@@ -2114,8 +2047,8 @@ public func parsePublicKey(address: String)  -> ChainPublicKey? {
 }
     )
 }
-public func parseTransaction(chain: Blockchain, transaction: String) throws  -> ParsedTransaction {
-    return try  FfiConverterTypeParsedTransaction.lift(
+public func parseTransaction(chain: Blockchain, transaction: String) throws  -> ChainTransaction {
+    return try  FfiConverterTypeChainTransaction.lift(
         try rustCallWithError(FfiConverterTypeTransactionError.lift) {
     uniffi_chainkit_fn_func_parse_transaction(
         FfiConverterTypeBlockchain.lower(chain),
@@ -2243,7 +2176,7 @@ private var initializationResult: InitializationResult {
     if (uniffi_chainkit_checksum_func_parse_public_key() != 39267) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_chainkit_checksum_func_parse_transaction() != 46478) {
+    if (uniffi_chainkit_checksum_func_parse_transaction() != 61500) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_chainkit_checksum_func_raw_private_key() != 30293) {
