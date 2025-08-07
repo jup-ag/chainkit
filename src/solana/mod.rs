@@ -10,7 +10,7 @@ use solana_sdk::{
     instruction::AccountMeta,
     message::Message,
     message::VersionedMessage,
-    pubkey,
+    pubkey::Pubkey,
     signature::{
         keypair_from_seed, keypair_from_seed_and_derivation_path, Keypair, Signature, Signer,
     },
@@ -2268,14 +2268,14 @@ mod tests {
 
     #[test]
     fn test_invalid_public_keys() {
-        assert!(parse_public_key("s".to_string()).is_none());
-        assert!(parse_public_key("sh".to_string()).is_none());
-        assert!(parse_public_key("sha".to_string()).is_none());
-        assert!(parse_public_key("shaq".to_string()).is_none());
-        assert!(parse_public_key("shaq.".to_string()).is_none());
-        assert!(parse_public_key("shaq.s".to_string()).is_none());
-        assert!(parse_public_key("shaq.so".to_string()).is_none());
-        assert!(parse_public_key("shaq.sol".to_string()).is_none());
+        assert!(Factory.parse_public_key("s").is_none());
+        assert!(Factory.parse_public_key("sh").is_none());
+        assert!(Factory.parse_public_key("sha").is_none());
+        assert!(Factory.parse_public_key("shaq").is_none());
+        assert!(Factory.parse_public_key("shaq.").is_none());
+        assert!(Factory.parse_public_key("shaq.s").is_none());
+        assert!(Factory.parse_public_key("shaq.so").is_none());
+        assert!(Factory.parse_public_key("shaq.sol").is_none());
     }
 
     #[test]
