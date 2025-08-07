@@ -75,6 +75,14 @@ impl UtilsFactory for Factory {
     }
 }
 
+impl PublicKeyFactory for Factory {
+    fn parse_public_key(&self, address: &str) -> Option<ParsedChainPublicKey> {
+        let pubkey = Pubkey::from_str(address).ok()?;
+        let is_on_curve = pubkey.is_on_curve();
+        Some(ParsedChainPublicKey::new(address, Blockchain::Solana, is_on_curve))
+    }
+}
+
 impl PrivateKeyFactory for Factory {
     fn derive(
         &self,
@@ -2248,5 +2256,31 @@ mod tests {
         assert!(parsed
             .instruction_programs
             .contains(&"11111111111111111111111111111111".to_string()));
+    }
+
+    #[test]
+    fn test_parse_public_key() {
+        let pubkey = Factory.parse_public_key("7vEitk7AmNJVJqwtsVsxSJkAhYQ4oHWXQadeDUeD4iMy").unwrap();
+        assert_eq!(pubkey.contents, "7vEitk7AmNJVJqwtsVsxSJkAhYQ4oHWXQadeDUeD4iMy");
+        assert_eq!(pubkey.chain, Blockchain::Solana);
+        assert_eq!(pubkey.is_on_curve, true);
+    }
+
+    #[test]
+    fn test_invalid_public_keys() {
+        assert!(Factory.parse_public_key("s").is_none());
+        assert!(Factory.parse_public_key("sh").is_none());
+        assert!(Factory.parse_public_key("sha").is_none());
+        assert!(Factory.parse_public_key("shaq").is_none());
+        assert!(Factory.parse_public_key("shaq.").is_none());
+        assert!(Factory.parse_public_key("shaq.s").is_none());
+        assert!(Factory.parse_public_key("shaq.so").is_none());
+        assert!(Factory.parse_public_key("shaq.sol").is_none());
+    }
+
+    #[test]
+    fn test_parse_public_key_off_curve() {
+        let pubkey = Factory.parse_public_key("4BJXYkfvg37zEmBbsacZjeQDpTNx91KppxFJxRqrz48e").unwrap();
+        assert_eq!(pubkey.is_on_curve, false);
     }
 }

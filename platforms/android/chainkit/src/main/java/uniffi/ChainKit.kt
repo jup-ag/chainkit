@@ -627,7 +627,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_chainkit_checksum_func_parse_private_key() != 20409.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_chainkit_checksum_func_parse_public_key() != 39267.toShort()) {
+    if (lib.uniffi_chainkit_checksum_func_parse_public_key() != 24472.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_chainkit_checksum_func_parse_transaction() != 61500.toShort()) {
@@ -1091,6 +1091,39 @@ public object FfiConverterTypeMnemonicWords: FfiConverterRustBuffer<MnemonicWord
 
     override fun write(value: MnemonicWords, buf: ByteBuffer) {
             FfiConverterSequenceString.write(value.`words`, buf)
+    }
+}
+
+
+
+data class ParsedChainPublicKey (
+    val `contents`: String, 
+    val `chain`: Blockchain, 
+    val `isOnCurve`: Boolean
+) {
+    
+    companion object
+}
+
+public object FfiConverterTypeParsedChainPublicKey: FfiConverterRustBuffer<ParsedChainPublicKey> {
+    override fun read(buf: ByteBuffer): ParsedChainPublicKey {
+        return ParsedChainPublicKey(
+            FfiConverterString.read(buf),
+            FfiConverterTypeBlockchain.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ParsedChainPublicKey) = (
+            FfiConverterString.allocationSize(value.`contents`) +
+            FfiConverterTypeBlockchain.allocationSize(value.`chain`) +
+            FfiConverterBoolean.allocationSize(value.`isOnCurve`)
+    )
+
+    override fun write(value: ParsedChainPublicKey, buf: ByteBuffer) {
+            FfiConverterString.write(value.`contents`, buf)
+            FfiConverterTypeBlockchain.write(value.`chain`, buf)
+            FfiConverterBoolean.write(value.`isOnCurve`, buf)
     }
 }
 
@@ -1889,35 +1922,6 @@ public object FfiConverterOptionalTypeChainPrivateKey: FfiConverterRustBuffer<Ch
 
 
 
-public object FfiConverterOptionalTypeChainPublicKey: FfiConverterRustBuffer<ChainPublicKey?> {
-    override fun read(buf: ByteBuffer): ChainPublicKey? {
-        if (buf.get().toInt() == 0) {
-            return null
-        }
-        return FfiConverterTypeChainPublicKey.read(buf)
-    }
-
-    override fun allocationSize(value: ChainPublicKey?): Int {
-        if (value == null) {
-            return 1
-        } else {
-            return 1 + FfiConverterTypeChainPublicKey.allocationSize(value)
-        }
-    }
-
-    override fun write(value: ChainPublicKey?, buf: ByteBuffer) {
-        if (value == null) {
-            buf.put(0)
-        } else {
-            buf.put(1)
-            FfiConverterTypeChainPublicKey.write(value, buf)
-        }
-    }
-}
-
-
-
-
 public object FfiConverterOptionalTypeExternalAddress: FfiConverterRustBuffer<ExternalAddress?> {
     override fun read(buf: ByteBuffer): ExternalAddress? {
         if (buf.get().toInt() == 0) {
@@ -1940,6 +1944,35 @@ public object FfiConverterOptionalTypeExternalAddress: FfiConverterRustBuffer<Ex
         } else {
             buf.put(1)
             FfiConverterTypeExternalAddress.write(value, buf)
+        }
+    }
+}
+
+
+
+
+public object FfiConverterOptionalTypeParsedChainPublicKey: FfiConverterRustBuffer<ParsedChainPublicKey?> {
+    override fun read(buf: ByteBuffer): ParsedChainPublicKey? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeParsedChainPublicKey.read(buf)
+    }
+
+    override fun allocationSize(value: ParsedChainPublicKey?): Int {
+        if (value == null) {
+            return 1
+        } else {
+            return 1 + FfiConverterTypeParsedChainPublicKey.allocationSize(value)
+        }
+    }
+
+    override fun write(value: ParsedChainPublicKey?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeParsedChainPublicKey.write(value, buf)
         }
     }
 }
@@ -2237,8 +2270,8 @@ fun `parsePrivateKey`(`key`: String): ChainPrivateKey? {
 }
 
 
-fun `parsePublicKey`(`address`: String): ChainPublicKey? {
-    return FfiConverterOptionalTypeChainPublicKey.lift(
+fun `parsePublicKey`(`address`: String): ParsedChainPublicKey? {
+    return FfiConverterOptionalTypeParsedChainPublicKey.lift(
     uniffiRustCall() { _status ->
     UniffiLib.INSTANCE.uniffi_chainkit_fn_func_parse_public_key(FfiConverterString.lower(`address`),_status)
 })
