@@ -10,7 +10,7 @@ use solana_sdk::{
     instruction::AccountMeta,
     message::Message,
     message::VersionedMessage,
-    pubkey::Pubkey,
+    pubkey,
     signature::{
         keypair_from_seed, keypair_from_seed_and_derivation_path, Keypair, Signature, Signer,
     },
@@ -72,6 +72,14 @@ impl UtilsFactory for Factory {
             .collect();
 
         Ok(MnemonicWords { words })
+    }
+}
+
+impl PublicKeyFactory for Factory {
+    fn parse_public_key(&self, address: &str) -> Option<ParsedChainPublicKey> {
+        let pubkey = Pubkey::from_str(address).ok()?;
+        let is_on_curve = pubkey.is_on_curve();
+        Some(ParsedChainPublicKey::new(address, Blockchain::Solana, is_on_curve))
     }
 }
 
@@ -2248,5 +2256,31 @@ mod tests {
         assert!(parsed
             .instruction_programs
             .contains(&"11111111111111111111111111111111".to_string()));
+    }
+
+    #[test]
+    fn test_parse_public_key() {
+        let pubkey = Factory.parse_public_key("7vEitk7AmNJVJqwtsVsxSJkAhYQ4oHWXQadeDUeD4iMy").unwrap();
+        assert_eq!(pubkey.contents, "7vEitk7AmNJVJqwtsVsxSJkAhYQ4oHWXQadeDUeD4iMy");
+        assert_eq!(pubkey.chain, Blockchain::Solana);
+        assert_eq!(pubkey.is_on_curve, true);
+    }
+
+    #[test]
+    fn test_invalid_public_keys() {
+        assert!(parse_public_key("s".to_string()).is_none());
+        assert!(parse_public_key("sh".to_string()).is_none());
+        assert!(parse_public_key("sha".to_string()).is_none());
+        assert!(parse_public_key("shaq".to_string()).is_none());
+        assert!(parse_public_key("shaq.".to_string()).is_none());
+        assert!(parse_public_key("shaq.s".to_string()).is_none());
+        assert!(parse_public_key("shaq.so".to_string()).is_none());
+        assert!(parse_public_key("shaq.sol".to_string()).is_none());
+    }
+
+    #[test]
+    fn test_parse_public_key_off_curve() {
+        let pubkey = Factory.parse_public_key("4BJXYkfvg37zEmBbsacZjeQDpTNx91KppxFJxRqrz48e").unwrap();
+        assert_eq!(pubkey.is_on_curve, false);
     }
 }

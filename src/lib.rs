@@ -50,18 +50,15 @@ pub fn is_valid(chain: Blockchain, address: String) -> bool {
     chain.key_factory().is_valid(&address)
 }
 
-/// Tries to parse any string and return a private key for the correct
-/// blockchain
-pub fn parse_public_key(address: String) -> Option<ChainPublicKey> {
-    let chain = if solana::Factory.is_valid(&address) {
-        Blockchain::Solana
-    } else {
-        return None;
-    };
-    Some(ChainPublicKey {
-        contents: address,
-        chain,
-    })
+/// Tries to parse any string and return a public key for the correct blockchain
+pub fn parse_public_key(address: String) -> Option<ParsedChainPublicKey> {
+    for blockchain in Blockchain::all() {
+        if let Some(parsed_key) = blockchain.public_key_factory().parse_public_key(&address) {
+            return Some(parsed_key);
+        }
+    }
+    
+    None
 }
 
 /// Tries to parse any data into a private key for a given blockchain
@@ -173,6 +170,10 @@ pub fn append_signature_to_transaction(signer: String, signature: String, transa
 }
 
 impl Blockchain {
+    fn all() -> Vec<Blockchain> {
+        vec![Blockchain::Solana]
+    }
+
     fn key_factory(&self) -> Box<dyn PrivateKeyFactory> {
         match self {
             Blockchain::Solana => Box::new(solana::Factory),
@@ -184,34 +185,18 @@ impl Blockchain {
             Blockchain::Solana => Box::new(solana::Factory),
         }
     }
+
+    fn public_key_factory(&self) -> Box<dyn PublicKeyFactory> {
+        match self {
+            Blockchain::Solana => Box::new(solana::Factory),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
-
-    #[test]
-    fn test_parse_public_keys() {
-        assert_eq!(
-            parse_public_key("HnXJX1Bvps8piQwDYEYC6oea9GEkvQvahvRj3c97X9xr".to_string())
-                .unwrap()
-                .chain,
-            Blockchain::Solana
-        );
-    }
-
-    #[test]
-    fn test_invalid_public_keys() {
-        assert!(parse_public_key("s".to_string()).is_none());
-        assert!(parse_public_key("sh".to_string()).is_none());
-        assert!(parse_public_key("sha".to_string()).is_none());
-        assert!(parse_public_key("shaq".to_string()).is_none());
-        assert!(parse_public_key("shaq.".to_string()).is_none());
-        assert!(parse_public_key("shaq.s".to_string()).is_none());
-        assert!(parse_public_key("shaq.so".to_string()).is_none());
-        assert!(parse_public_key("shaq.sol".to_string()).is_none());
-    }
 
     #[test]
     fn test_parse_private_key() {

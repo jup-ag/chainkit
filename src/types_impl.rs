@@ -62,6 +62,16 @@ impl DecimalNumber {
     }
 }
 
+impl ParsedChainPublicKey {
+    pub fn new(address: impl AsRef<str>, chain: Blockchain, is_on_curve: bool) -> Self {
+        Self {
+            contents: address.as_ref().to_string(),
+            chain,
+            is_on_curve,
+        }
+    }
+}
+
 impl ChainPublicKey {
     pub fn new(address: impl AsRef<str>, chain: Blockchain) -> Self {
         Self {

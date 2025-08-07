@@ -62,6 +62,12 @@ dictionary ChainPrivateKey {
     ChainPublicKey public_key;
 };
 
+dictionary ParsedChainPublicKey {
+  string contents;
+  Blockchain chain;
+  boolean is_on_curve;
+}
+
 dictionary ChainPublicKey {
     string contents;
     Blockchain chain;
@@ -132,7 +138,7 @@ namespace ChainKit {
   boolean is_valid(Blockchain chain, string address);
 
   // Parse `address` and determine the correct blockchain for this public key
-  ChainPublicKey? parse_public_key(string address);
+  ParsedChainPublicKey? parse_public_key(string address);
 
   // Tries to parse any data into a private key for a given blockchain
   ChainPrivateKey? parse_private_key(string key);

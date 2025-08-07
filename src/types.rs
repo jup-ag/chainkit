@@ -9,6 +9,14 @@ pub trait UtilsFactory {
     ) -> Result<MnemonicWords, KeyError>;
 }
 
+pub trait PublicKeyFactory {
+    /// Tries to parse any string and return a public key with additional data
+    fn parse_public_key(
+        &self, 
+        address: &str
+    ) -> Option<ParsedChainPublicKey>;
+}
+
 pub trait PrivateKeyFactory {
     /// Derives private keys in range
     fn derive(
@@ -169,6 +177,15 @@ pub struct DerivedPrivateKey {
 pub struct ChainPrivateKey {
     pub contents: String,
     pub public_key: ChainPublicKey,
+}
+
+/// Representation of a parsed public key with additional data
+/// - `contents` Hex representation of a public key **WITH** `0x`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParsedChainPublicKey {
+    pub contents: String,
+    pub chain: Blockchain,
+    pub is_on_curve: bool,
 }
 
 /// Representation of a public key
