@@ -22,6 +22,30 @@ pub fn generate_mnemonic(
         .generate_mnemonic(length)
 }
 
+pub fn generate_keypair() -> GeneratedKeypair {
+    solana::Factory.generate_keypair()
+}
+
+fn encrypt_message_base64(
+    my_secret_b64: &str,
+    their_public_b64: &str,
+    message_b64: &str
+) -> String {
+    solana::Factory.encrypt_message_base64(my_secret_b64, their_public_b64, message_b64)
+}
+
+fn decrypt_message_base64(
+    my_secret_b64: &str,
+    their_public_b64: &str,
+    payload_b64: &str
+) -> String {
+    solana::Factory.decrypt_message_base64(
+        my_secret_b64,
+        their_public_b64,
+        payload_b64
+    )
+}
+
 // PrivateKeyFactory
 
 pub fn derive(
