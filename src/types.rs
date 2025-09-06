@@ -7,6 +7,27 @@ pub trait UtilsFactory {
         &self,
         length: u32
     ) -> Result<MnemonicWords, KeyError>;
+
+    /// Generate a Curve25519 keypair (public, secret).
+    fn generate_keypair(&self) -> GeneratedKeypair;
+
+    /// Encrypt using *my* secret key and *their* public key (both Base64).
+    /// Returns Base64(nonce || compact_cipher).
+    fn encrypt_message_base64(
+        &self,
+        my_secret_b64: &str,
+        their_public_b64: &str,
+        message_b64: &str
+    ) -> String;
+
+    /// Decrypt using my secret key and their public key (both Base64).
+    /// Takes Base64(nonce || compact_cipher), returns Base64(plaintext).
+    fn decrypt_message_base64(
+        &self,
+        my_secret_b64: &str,
+        their_public_b64: &str,
+        payload_b64: &str,
+    ) -> String;
 }
 
 pub trait PublicKeyFactory {
@@ -269,4 +290,10 @@ pub struct ChainTransaction {
     pub full_signature: Option<String>,
     pub signatures: Option<Vec<String>>,
     pub instruction_programs: Vec<String>,
+}
+
+/// Structure representing a NaCl keypair with Base64-encoded keys.
+pub struct GeneratedKeypair {
+    pub public_key_b64: String,
+    pub secret_key_b64: String,
 }

@@ -20,6 +20,8 @@ secp256k1 = "0.27.0"
 miniscript = "10.0.0"
 rust_decimal = "1.26.1"
 base64 = "0.21.0"
+sodalite = { version = "0.4.0", features = ["rand"] }
+rand = "0.8.5"
 
 # Solana
 solana-sdk = "1.15.2"

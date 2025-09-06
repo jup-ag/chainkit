@@ -25,7 +25,10 @@ use types::ExternalAddress;
 
 use super::types::*;
 use crate::errors::*;
-use crate::utils::{from_base64, to_base64};
+use crate::utils::{from_base64, to_base64, from_base64_to_array_32};
+
+use rand::RngCore;
+use sodalite;
 
 mod jupiter_helpers;
 use jupiter_helpers::mutate_transaction_slippage_bps;
@@ -41,6 +44,8 @@ const TOKEN_2022_PROGRAM: &str = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 const SPL_PROGRAM: &str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const INVITE_ESCROW_PROGRAM: &str = "inv1tEtSwRMtM44tbvJGNiTxMvDfPVnX9StyqXfDfks";
 const ALLOWED_PROGRAMS: [&str; 3] = [TOKEN_2022_PROGRAM, SPL_PROGRAM, INVITE_ESCROW_PROGRAM];
+const ZEROBYTES: usize = 32;     // pad on message input to secretbox
+const BOXZEROBYTES: usize = 16;  // pad on cipher input to open
 
 impl UtilsFactory for Factory {
     fn generate_mnemonic(&self, length: u32) -> Result<MnemonicWords, KeyError> {
@@ -72,6 +77,94 @@ impl UtilsFactory for Factory {
             .collect();
 
         Ok(MnemonicWords { words })
+    }
+
+    fn generate_keypair(&self) -> GeneratedKeypair {
+        let mut public_key = [0u8; sodalite::BOX_PUBLIC_KEY_LEN];
+        let mut secret_key = [0u8; sodalite::BOX_SECRET_KEY_LEN];
+
+        // generates a fresh Curve25519 keypair
+        sodalite::box_keypair(&mut public_key, &mut secret_key);
+
+        GeneratedKeypair {
+            public_key_b64: to_base64(public_key),
+            secret_key_b64: to_base64(secret_key),
+        }
+    }
+
+    fn encrypt_message_base64(
+        &self,
+        my_secret_b64: &str,
+        their_public_b64: &str,
+        message_b64: &str
+    ) -> String {
+        // 1) derive precomputed shared key
+        let sk = from_base64_to_array_32("my secret key", my_secret_b64);
+        let pk = from_base64_to_array_32("their public key", their_public_b64);
+        let mut shared = [0u8; 32];
+        sodalite::box_beforenm(&mut shared, &pk, &sk);
+
+        // 2) decode message from Base64
+        let message_bytes = from_base64(message_b64)
+            .expect("invalid base64 plaintext");
+
+        // 3) nonce
+        let mut nonce = [0u8; sodalite::BOX_NONCE_LEN];
+        rand::thread_rng().fill_bytes(&mut nonce);
+
+        // 4) pad plaintext with 32 zero bytes
+        let mut m = vec![0u8; ZEROBYTES + message_bytes.len()];
+        m[ZEROBYTES..].copy_from_slice(&message_bytes);
+
+        // 5) encrypt
+        let mut c = vec![0u8; m.len()];
+        sodalite::box_afternm(&mut c, &m, &nonce, &shared);
+
+        // 6) strip the first 16 bytes → compact cipher
+        let compact = &c[BOXZEROBYTES..];
+
+        // 7) wire format: Base64(nonce || compact)
+        let mut out = Vec::with_capacity(sodalite::BOX_NONCE_LEN + compact.len());
+        out.extend_from_slice(&nonce);
+        out.extend_from_slice(compact);
+        to_base64(out)
+    }
+
+    fn decrypt_message_base64(
+        &self,
+        my_secret_b64: &str,
+        their_public_b64: &str,
+        payload_b64: &str,
+    ) -> String {
+        // 1) derive shared key
+        let sk = from_base64_to_array_32("my secret key", my_secret_b64);
+        let pk = from_base64_to_array_32("their public key", their_public_b64);
+        let mut shared = [0u8; 32];
+        sodalite::box_beforenm(&mut shared, &pk, &sk);
+
+        // 2) decode wire format
+        let all = from_base64(payload_b64)
+            .expect("payload: invalid base64");
+        assert!(all.len() > sodalite::BOX_NONCE_LEN, "payload too short");
+
+        let mut nonce = [0u8; sodalite::BOX_NONCE_LEN];
+        nonce.copy_from_slice(&all[..sodalite::BOX_NONCE_LEN]);
+        let compact = &all[sodalite::BOX_NONCE_LEN..];
+
+        // 3) re-pad cipher with 16 leading zeros
+        let mut c = vec![0u8; BOXZEROBYTES + compact.len()];
+        c[BOXZEROBYTES..].copy_from_slice(compact);
+
+        // 4) decrypt into buffer same length as c
+        let mut m = vec![0u8; c.len()];
+        let rc = sodalite::box_open_afternm(&mut m, &c, &nonce, &shared);
+        assert!(rc.is_ok(), "decryption/authentication failed");
+
+        // 5) strip the first 32 zeros → raw plaintext bytes
+        let plaintext = &m[ZEROBYTES..];
+
+        // 6) return Base64(plaintext)
+        to_base64(plaintext)
     }
 }
 
@@ -1150,6 +1243,28 @@ mod tests {
     use crate::solana::types::ExternalAddress;
     use spl_associated_token_account::instruction::create_associated_token_account;
     use std::collections::HashSet;
+
+    #[test]
+    fn test_generate_keypayir_encrytpion_and_decription() {
+        // --- Generate Alice & Bob ---
+        let alice = Factory.generate_keypair();
+        let bob = Factory.generate_keypair();
+
+        eprintln!("Alice pub (b64): {}", alice.public_key_b64);
+        eprintln!("Alice sec (b64): {}", alice.secret_key_b64);
+        eprintln!("Bob   pub (b64): {}", bob.public_key_b64);
+        eprintln!("Bob   sec (b64): {}", bob.secret_key_b64);
+
+        // --- Encrypt from Alice to Bob ---
+        let message_basee64 = to_base64("Hello Bob from Alice (Rust NaCl)".as_bytes());
+        eprintln!("Messagge (b64): {}", message_basee64);
+        let payload = Factory.encrypt_message_base64(&alice.secret_key_b64, &bob.public_key_b64, &message_basee64);
+        eprintln!("Encrypted payload (b64): {}", payload);
+
+        // --- Bob decrypts ---
+        let decrypted = Factory.decrypt_message_base64(&bob.secret_key_b64, &alice.public_key_b64, &payload);
+        eprintln!("Decrypted: {}", decrypted);
+    }
 
     #[test]
     fn test_generate_mnemonic_12_words() {
