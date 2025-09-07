@@ -386,11 +386,17 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_chainkit_fn_func_decrypt_ciphertext(`ciphertext`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_chainkit_fn_func_decrypt_message_base64(`mySecretB64`: RustBuffer.ByValue,`theirPublicB64`: RustBuffer.ByValue,`payloadB64`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_chainkit_fn_func_derive(`chain`: RustBuffer.ByValue,`mnemonic`: RustBuffer.ByValue,`passphrase`: RustBuffer.ByValue,`derivation`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_chainkit_fn_func_derive_from_data(`chain`: RustBuffer.ByValue,`data`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_chainkit_fn_func_encrypt_message_base64(`mySecretB64`: RustBuffer.ByValue,`theirPublicB64`: RustBuffer.ByValue,`messageB64`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun uniffi_chainkit_fn_func_encrypt_plaintext(`plaintext`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_chainkit_fn_func_generate_key_pair(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_chainkit_fn_func_generate_mnemonic(`length`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -538,11 +544,17 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_chainkit_checksum_func_decrypt_ciphertext(
     ): Short
+    fun uniffi_chainkit_checksum_func_decrypt_message_base64(
+    ): Short
     fun uniffi_chainkit_checksum_func_derive(
     ): Short
     fun uniffi_chainkit_checksum_func_derive_from_data(
     ): Short
+    fun uniffi_chainkit_checksum_func_encrypt_message_base64(
+    ): Short
     fun uniffi_chainkit_checksum_func_encrypt_plaintext(
+    ): Short
+    fun uniffi_chainkit_checksum_func_generate_key_pair(
     ): Short
     fun uniffi_chainkit_checksum_func_generate_mnemonic(
     ): Short
@@ -597,13 +609,22 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_chainkit_checksum_func_decrypt_ciphertext() != 29.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_chainkit_checksum_func_decrypt_message_base64() != 35889.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_chainkit_checksum_func_derive() != 1524.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_chainkit_checksum_func_derive_from_data() != 63262.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_chainkit_checksum_func_encrypt_message_base64() != 24885.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_chainkit_checksum_func_encrypt_plaintext() != 12131.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_chainkit_checksum_func_generate_key_pair() != 32769.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_chainkit_checksum_func_generate_mnemonic() != 2201.toShort()) {
@@ -1066,6 +1087,35 @@ public object FfiConverterTypeExternalAddress: FfiConverterRustBuffer<ExternalAd
 
     override fun write(value: ExternalAddress, buf: ByteBuffer) {
             FfiConverterString.write(value.`recentBlockhash`, buf)
+    }
+}
+
+
+
+data class GeneratedKeyPair (
+    val `publicKeyB64`: String, 
+    val `secretKeyB64`: String
+) {
+    
+    companion object
+}
+
+public object FfiConverterTypeGeneratedKeyPair: FfiConverterRustBuffer<GeneratedKeyPair> {
+    override fun read(buf: ByteBuffer): GeneratedKeyPair {
+        return GeneratedKeyPair(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: GeneratedKeyPair) = (
+            FfiConverterString.allocationSize(value.`publicKeyB64`) +
+            FfiConverterString.allocationSize(value.`secretKeyB64`)
+    )
+
+    override fun write(value: GeneratedKeyPair, buf: ByteBuffer) {
+            FfiConverterString.write(value.`publicKeyB64`, buf)
+            FfiConverterString.write(value.`secretKeyB64`, buf)
     }
 }
 
@@ -2181,6 +2231,14 @@ fun `decryptCiphertext`(`ciphertext`: String, `password`: String): String {
 })
 }
 
+
+fun `decryptMessageBase64`(`mySecretB64`: String, `theirPublicB64`: String, `payloadB64`: String): String {
+    return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_chainkit_fn_func_decrypt_message_base64(FfiConverterString.lower(`mySecretB64`),FfiConverterString.lower(`theirPublicB64`),FfiConverterString.lower(`payloadB64`),_status)
+})
+}
+
 @Throws(KeyException::class)
 
 fun `derive`(`chain`: Blockchain, `mnemonic`: MnemonicWords, `passphrase`: String?, `derivation`: Derivation): List<DerivedPrivateKey> {
@@ -2199,12 +2257,28 @@ fun `deriveFromData`(`chain`: Blockchain, `data`: String): DerivedPrivateKey {
 })
 }
 
+
+fun `encryptMessageBase64`(`mySecretB64`: String, `theirPublicB64`: String, `messageB64`: String): String {
+    return FfiConverterString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_chainkit_fn_func_encrypt_message_base64(FfiConverterString.lower(`mySecretB64`),FfiConverterString.lower(`theirPublicB64`),FfiConverterString.lower(`messageB64`),_status)
+})
+}
+
 @Throws(EncryptionException::class)
 
 fun `encryptPlaintext`(`plaintext`: String, `password`: String): String {
     return FfiConverterString.lift(
     uniffiRustCallWithError(EncryptionException) { _status ->
     UniffiLib.INSTANCE.uniffi_chainkit_fn_func_encrypt_plaintext(FfiConverterString.lower(`plaintext`),FfiConverterString.lower(`password`),_status)
+})
+}
+
+
+fun `generateKeyPair`(): GeneratedKeyPair {
+    return FfiConverterTypeGeneratedKeyPair.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_chainkit_fn_func_generate_key_pair(_status)
 })
 }
 

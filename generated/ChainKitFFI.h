@@ -55,11 +55,18 @@ RustBuffer uniffi_chainkit_fn_func_append_signature_to_transaction(RustBuffer si
 );
 RustBuffer uniffi_chainkit_fn_func_decrypt_ciphertext(RustBuffer ciphertext, RustBuffer password, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_chainkit_fn_func_decrypt_message_base64(RustBuffer my_secret_b64, RustBuffer their_public_b64, RustBuffer payload_b64, RustCallStatus *_Nonnull out_status
+);
 RustBuffer uniffi_chainkit_fn_func_derive(RustBuffer chain, RustBuffer mnemonic, RustBuffer passphrase, RustBuffer derivation, RustCallStatus *_Nonnull out_status
 );
 RustBuffer uniffi_chainkit_fn_func_derive_from_data(RustBuffer chain, RustBuffer data, RustCallStatus *_Nonnull out_status
 );
+RustBuffer uniffi_chainkit_fn_func_encrypt_message_base64(RustBuffer my_secret_b64, RustBuffer their_public_b64, RustBuffer message_b64, RustCallStatus *_Nonnull out_status
+);
 RustBuffer uniffi_chainkit_fn_func_encrypt_plaintext(RustBuffer plaintext, RustBuffer password, RustCallStatus *_Nonnull out_status
+);
+RustBuffer uniffi_chainkit_fn_func_generate_key_pair(RustCallStatus *_Nonnull out_status
+    
 );
 RustBuffer uniffi_chainkit_fn_func_generate_mnemonic(uint32_t length, RustCallStatus *_Nonnull out_status
 );
@@ -209,13 +216,22 @@ uint16_t uniffi_chainkit_checksum_func_append_signature_to_transaction(void
 uint16_t uniffi_chainkit_checksum_func_decrypt_ciphertext(void
     
 );
+uint16_t uniffi_chainkit_checksum_func_decrypt_message_base64(void
+    
+);
 uint16_t uniffi_chainkit_checksum_func_derive(void
     
 );
 uint16_t uniffi_chainkit_checksum_func_derive_from_data(void
     
 );
+uint16_t uniffi_chainkit_checksum_func_encrypt_message_base64(void
+    
+);
 uint16_t uniffi_chainkit_checksum_func_encrypt_plaintext(void
+    
+);
+uint16_t uniffi_chainkit_checksum_func_generate_key_pair(void
     
 );
 uint16_t uniffi_chainkit_checksum_func_generate_mnemonic(void
