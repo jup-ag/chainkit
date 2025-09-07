@@ -79,14 +79,14 @@ impl UtilsFactory for Factory {
         Ok(MnemonicWords { words })
     }
 
-    fn generate_keypair(&self) -> GeneratedKeypair {
+    fn generate_key_pair(&self) -> GeneratedKeyPair {
         let mut public_key = [0u8; sodalite::BOX_PUBLIC_KEY_LEN];
         let mut secret_key = [0u8; sodalite::BOX_SECRET_KEY_LEN];
 
         // generates a fresh Curve25519 keypair
         sodalite::box_keypair(&mut public_key, &mut secret_key);
 
-        GeneratedKeypair {
+        GeneratedKeyPair {
             public_key_b64: to_base64(public_key),
             secret_key_b64: to_base64(secret_key),
         }
@@ -1247,8 +1247,8 @@ mod tests {
     #[test]
     fn test_generate_keypayir_encrytpion_and_decription() {
         // --- Generate Alice & Bob ---
-        let alice = Factory.generate_keypair();
-        let bob = Factory.generate_keypair();
+        let alice = Factory.generate_key_pair();
+        let bob = Factory.generate_key_pair();
 
         eprintln!("Alice pub (b64): {}", alice.public_key_b64);
         eprintln!("Alice sec (b64): {}", alice.secret_key_b64);

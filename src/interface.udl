@@ -113,6 +113,11 @@ interface TokenDestination {
   Wallet(ChainPublicKey public_key);
 };
 
+dictionary GeneratedKeyPair {
+    string public_key_b64;
+    string secret_key_b64;
+};
+
 namespace ChainKit {
 
   // Key Functions
@@ -142,6 +147,9 @@ namespace ChainKit {
 
   // Tries to parse any data into a private key for a given blockchain
   ChainPrivateKey? parse_private_key(string key);
+
+  // Generate a Curve25519 keypair (Base64-encoded keys)
+  GeneratedKeyPair generate_key_pair();
 
   // Transaction Functions
 
@@ -182,6 +190,14 @@ namespace ChainKit {
 
   [Throws=EncryptionError]
   string decrypt_ciphertext(string ciphertext, string password);
+
+  // Encrypt using *my* secret key and *their* public key (both Base64).
+  // Returns Base64(nonce || compact_cipher).
+  string encrypt_message_base64(string my_secret_b64, string their_public_b64, string message_b64);
+
+  // Decrypt using my secret key and their public key (both Base64).
+  // Takes Base64(nonce || compact_cipher), returns Base64(plaintext).
+  string decrypt_message_base64(string my_secret_b64, string their_public_b64, string payload_b64);
 
   // Gets associated token address.
   [Throws=TransactionError]

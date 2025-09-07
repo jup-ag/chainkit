@@ -869,6 +869,64 @@ public func FfiConverterTypeExternalAddress_lower(_ value: ExternalAddress) -> R
 }
 
 
+public struct GeneratedKeyPair {
+    public var publicKeyB64: String
+    public var secretKeyB64: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        publicKeyB64: String, 
+        secretKeyB64: String) {
+        self.publicKeyB64 = publicKeyB64
+        self.secretKeyB64 = secretKeyB64
+    }
+}
+
+
+extension GeneratedKeyPair: Equatable, Hashable {
+    public static func ==(lhs: GeneratedKeyPair, rhs: GeneratedKeyPair) -> Bool {
+        if lhs.publicKeyB64 != rhs.publicKeyB64 {
+            return false
+        }
+        if lhs.secretKeyB64 != rhs.secretKeyB64 {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(publicKeyB64)
+        hasher.combine(secretKeyB64)
+    }
+}
+
+
+public struct FfiConverterTypeGeneratedKeyPair: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> GeneratedKeyPair {
+        return
+            try GeneratedKeyPair(
+                publicKeyB64: FfiConverterString.read(from: &buf), 
+                secretKeyB64: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: GeneratedKeyPair, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.publicKeyB64, into: &buf)
+        FfiConverterString.write(value.secretKeyB64, into: &buf)
+    }
+}
+
+
+public func FfiConverterTypeGeneratedKeyPair_lift(_ buf: RustBuffer) throws -> GeneratedKeyPair {
+    return try FfiConverterTypeGeneratedKeyPair.lift(buf)
+}
+
+public func FfiConverterTypeGeneratedKeyPair_lower(_ value: GeneratedKeyPair) -> RustBuffer {
+    return FfiConverterTypeGeneratedKeyPair.lower(value)
+}
+
+
 public struct MnemonicWords {
     public var words: [String]
 
@@ -2014,6 +2072,16 @@ public func decryptCiphertext(ciphertext: String, password: String) throws  -> S
 }
     )
 }
+public func decryptMessageBase64(mySecretB64: String, theirPublicB64: String, payloadB64: String)  -> String {
+    return try!  FfiConverterString.lift(
+        try! rustCall() {
+    uniffi_chainkit_fn_func_decrypt_message_base64(
+        FfiConverterString.lower(mySecretB64),
+        FfiConverterString.lower(theirPublicB64),
+        FfiConverterString.lower(payloadB64),$0)
+}
+    )
+}
 public func derive(chain: Blockchain, mnemonic: MnemonicWords, passphrase: String?, derivation: Derivation) throws  -> [DerivedPrivateKey] {
     return try  FfiConverterSequenceTypeDerivedPrivateKey.lift(
         try rustCallWithError(FfiConverterTypeKeyError.lift) {
@@ -2034,12 +2102,29 @@ public func deriveFromData(chain: Blockchain, data: String) throws  -> DerivedPr
 }
     )
 }
+public func encryptMessageBase64(mySecretB64: String, theirPublicB64: String, messageB64: String)  -> String {
+    return try!  FfiConverterString.lift(
+        try! rustCall() {
+    uniffi_chainkit_fn_func_encrypt_message_base64(
+        FfiConverterString.lower(mySecretB64),
+        FfiConverterString.lower(theirPublicB64),
+        FfiConverterString.lower(messageB64),$0)
+}
+    )
+}
 public func encryptPlaintext(plaintext: String, password: String) throws  -> String {
     return try  FfiConverterString.lift(
         try rustCallWithError(FfiConverterTypeEncryptionError.lift) {
     uniffi_chainkit_fn_func_encrypt_plaintext(
         FfiConverterString.lower(plaintext),
         FfiConverterString.lower(password),$0)
+}
+    )
+}
+public func generateKeyPair()  -> GeneratedKeyPair {
+    return try!  FfiConverterTypeGeneratedKeyPair.lift(
+        try! rustCall() {
+    uniffi_chainkit_fn_func_generate_key_pair($0)
 }
     )
 }
@@ -2210,13 +2295,22 @@ private var initializationResult: InitializationResult {
     if (uniffi_chainkit_checksum_func_decrypt_ciphertext() != 29) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_chainkit_checksum_func_decrypt_message_base64() != 35889) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_chainkit_checksum_func_derive() != 1524) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_chainkit_checksum_func_derive_from_data() != 63262) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_chainkit_checksum_func_encrypt_message_base64() != 24885) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_chainkit_checksum_func_encrypt_plaintext() != 12131) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_chainkit_checksum_func_generate_key_pair() != 32769) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_chainkit_checksum_func_generate_mnemonic() != 2201) {
